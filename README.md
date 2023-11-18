@@ -1,1 +1,1 @@
-# tf2-autopricer
+# bptf-autopricer
