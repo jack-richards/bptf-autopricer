@@ -2,6 +2,16 @@
 <div align="center"><img src="https://github.com/jack-richards/bptf-autopricer/assets/58331725/203fe808-30ff-4d7d-868c-a3ef6d31497d" alt="logo" style="width: 280px; height: 320px; display: block; margin-left: auto; margin-right: auto;"></div>
 
 #
+<div align="center">
+  
+[![Version](https://img.shields.io/github/v/release/jack-richards/bptf-autopricer.svg)](https://github.com/jack-richards/bptf-autopricer/releases)
+[![GitHub forks](https://img.shields.io/github/forks/jack-richards/bptf-autopricer)](https://github.com/jack-richards/bptf-autopricer/network/members)
+[![GitHub Repo stars](https://img.shields.io/github/stars/jack-richards/bptf-autopricer)](https://github.com/jack-richards/bptf-autopricer/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/jack-richards/bptf-autopricer)](https://github.com/jack-richards/bptf-autopricer/issues)
+[![License](https://img.shields.io/github/license/jack-richards/bptf-autopricer.svg)](https://opensource.org/licenses/MIT)
+[![Known Vulnerabilities](https://snyk.io/test/github/jack-richards/bptf-autopricer/badge.svg)](https://snyk.io/test/github/jack-richards/bptf-autopricer)
+
+</div>
 
 An open-source application that automatically generates item prices using listing data retrieved from backpack.tf. Prices are then compared against data from [Prices.tf](https://github.com/prices-tf), serving as a baseline. If a price deviates beyond the percentages set in the config, it is not used.
 
