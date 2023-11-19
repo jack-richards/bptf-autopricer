@@ -6,7 +6,7 @@
         "schema": "tf2",
         "host": "localhost",
         "port": 5432,
-        "database": "backpacktf-ws",
+        "name": "backpacktf-ws",
         "user": "postgres",
         "password": "database password"
     },
