@@ -13,11 +13,11 @@
 
 </div>
 
-An open-source application that automatically generates item prices using listing data retrieved from backpack.tf. Prices are then compared against data from [Prices.tf](https://github.com/prices-tf), serving as a baseline. If a price deviates beyond the percentages set in the config, it is not used.
+An open-source solution that generates item prices for selected items by utilising listing data from [backpack.tf](https://backpack.tf/). Each price created is a result of the meticulous evaluation of both the underlying data and the actual prices, incorporating multiple checks and balances to counteract potential price manipulation.
 
 ## Features
 
-- **Automated Pricing:** Automatically generates item prices using [backpack.tf](https://backpack.tf/) listing data, ensuring a profit margin and performing various sanity checks.
+- **Automated Pricing:** Automatically generates item prices using both real-time and snapshot [backpack.tf](https://backpack.tf/) listing data, ensuring a profit margin and performing various sanity checks.
 
 - **Baseline Comparison:** Compares generated prices against those from [Prices.tf](https://github.com/prices-tf) - disregarding prices that go over percentage thresholds configured.
 
