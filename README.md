@@ -20,6 +20,12 @@ An open-source application that automatically generates item prices using listin
 - **Automated Pricing:** Automatically generates item prices using [backpack.tf](https://backpack.tf/) listing data, ensuring a profit margin and performing various sanity checks.
 
 - **Baseline Comparison:** Compares generated prices against those from [Prices.tf](https://github.com/prices-tf) - disregarding prices that go over percentage thresholds configured.
+
+- **Trusted/Blacklisted Steam IDs:** Prioritises listings from trusted bots, and filters out untrusted bots when calculating prices. Fully configurable.
+
+- **Excluded Listing Descriptions:** Filters out listings with descriptions containing configured keywords. Useful for removing listings from calculations that include special attributes, such as spells.
+
+- **Filters Outliers:** With a sufficient number of listings, filters out outliers from the mean. Removes listings with prices that deviate too much from the average.
   
 - **API Functionality:**
   - *Add and Delete Items:* The API can be used to add or remove items for the auto pricer to track.
@@ -30,9 +36,9 @@ An open-source application that automatically generates item prices using listin
   - Prices are stored and emitted in a format fully supported by the [TF2 Auto Bot](https://github.com/TF2Autobot/tf2autobot) custom-pricer interface.
 
 ## Requirements
-Dependencies should be satisfied by running `npm install` in the same directory as the project and package.json.
-
-This application requires a PostgreSQL database containing a table with the following layout:
+- Install dependencies by running npm install in the project directory with package.json.
+- A PostgreSQL database is required. Create a database and schema according to your preferences and specify them in the config.json file.
+- The PostgreSQL table named listings must be created. Use the following SQL statement:
 ```sql
 CREATE TABLE listings (
     name character varying NOT NULL,
@@ -44,22 +50,80 @@ CREATE TABLE listings (
     CONSTRAINT listings_pkey PRIMARY KEY (name, sku, intent, steamid)
 );
 ```
-The name of the database and schema, and what user owns the table are left to your discretion but will need to be specified in the `config.json` file.
+Make sure to specify the database name, schema, user, and other relevant details in the `config.json` file.
 
-## Baseline Thresholds
-Within `config.json`, you can specify the maximum difference from the baseline (prices.tf) you will accept before a price is rejected. Adjust the maximum percentage differences for buy and sell according to your preferences.
+## Configuration
+To configure the application you need to specify the values for all the fields in `config.json`.
+```JSON
+{
+    "bptfAPIKey": "your bptf api key",
+    "bptfToken": "your bptf token",
+    "steamAPIKey": "your steam api key",
+    "database": {
+        "schema": "tf2",
+        "host": "localhost",
+        "port": 5432,
+        "name": "backpacktf-ws",
+        "user": "postgres",
+        "password": "database password"
+    },
+    "pricerAPIPort": 3456,
+    "pricerSocketPort": 9850,
+    "maxPercentageDifferences": {
+        "buy": 5,
+        "sell": -8
+    },
+    "excludedSteamIDs": [
+        "76561199384015307"
+    ],
+    "trustedSteamIDs": [
+        "76561199110778355"
+    ],
+    "excludedListingDescriptions": [
+        "exorcism",
+    ]
+}
+```
+The majority of these fields are self-explanatory. I will explain the ones that may not be.
+
+### `maxPercentageDifferences`
+Contains two fields, `buy` and `sell`. These values represent the maximum difference from the baseline (prices.tf) you will accept before a price is rejected. Adjust the maximum percentage differences for buy and sell according to your preferences.
+- A higher **buy** percentage means that the auto pricer is willing to buy items for a higher price than prices.tf.
+- A lower **sell** percentage means that the auto pricer is willing to sell items for a lower price than prices.tf.
+  
 ```JSON
 "maxPercentageDifferences": {
   "buy": 5,
   "sell": -8
 }
 ```
-### Percentage Explanations:
-**Buy Percentage**:
-- A higher percentage means that the auto pricer is willing to buy items for a higher price than prices.tf.
 
-**Sell Percentage**:
-- A lower percentage means that the auto pricer is willing to sell items for a lower price than prices.tf.
+### `excludedSteamIDs`
+A list of Steam ID 64s that you don't want to use the listings of in pricing calculations. This is useful for stopping bad actors that you know of from attempting to manipulate the prices created. It's important to note that this is not a fool-proof solution and because of this other methods are also used to reduce the risks of price manipulation.
+
+```JSON
+"excludedSteamIDs": [
+    "76561199384015307"
+]
+```
+
+### `trustedSteamIDs`
+A list of Steam ID 64s used to prioritise listings owned by these IDs over others during pricing calculations. This feature is beneficial when you want to give preference to bots or users that consistently provide accurate pricing data.
+
+```JSON
+"trustedSteamIDs": [
+    "76561199110778355"
+],
+```
+
+### `excludedListingDescriptions`
+A list of descriptions that, when detected within a listing's details, causes the listing to be disregarded and not used during pricing calculations. This is useful for excluding listings involving items with 'special attributes,' such as spells, when calculating prices. Leaving such listings in the calculations can risk affecting the average price in unexpected ways.
+
+```JSON
+"excludedListingDescriptions": [
+    "exorcism",
+]
+```
 
 ## API Routes
 Here I'll highlight the different API routes you can make queries to, and what responses you can expect to receive.\
