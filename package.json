@@ -1,0 +1,35 @@
+{
+  "name": "bptf-autopricer",
+  "version": "1.0.0",
+  "description": "Automatically prices items using listing data from backpack.tf, with data from prices.tf acting as a baseline.",
+  "main": "bptf-autopricer.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jack-richards/bptf-autopricer.git"
+  },
+  "keywords": [
+    "tf2",
+    "team fortress 2",
+    "tf2 autopricer",
+    "backpack tf",
+    "backpack tf autopricer",
+    "bptf",
+    "bptf autopricer"
+  ],
+  "author": "Jack Samuel Richards",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jack-richards/bptf-autopricer/issues"
+  },
+  "homepage": "https://github.com/jack-richards/bptf-autopricer#readme",
+  "dependencies": {
+    "@tf2autobot/tf2-schema": "^4.3.0",
+    "axios": "^1.6.2",
+    "chokidar": "^3.5.3",
+    "pg-promise": "^11.5.4",
+    "reconnecting-websocket": "^4.4.0"
+  }
+}
