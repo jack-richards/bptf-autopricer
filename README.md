@@ -51,6 +51,81 @@ Within `config.json`, you can specify the maximum difference from the baseline (
 **Sell Percentage**:
 - A lower percentage means that the auto pricer is willing to sell items for a lower price than prices.tf.
 
+## API Routes
+Here I'll highlight the different API routes you can make queries to, and what responses you can expect to receive.\
+Please note that the API runs locally (localhost) on the port defined in `config.json` in the `pricerAPIPort` key.
+#
+```plain text
+GET /api/:sku
+```
+Retrieves a particular item object from the pricelist using the Stock Keeping Unit (SKU) provided. Item object returned contains the prices for the item.
+
+**Request:**
+- **Parameters:**
+  - `sku` (String): The Stock Keeping Unit of the item. E.g., Mann Co. Supply Crate Key has an SKU of 5021;6.
+
+**Response:**
+- **Success (200):**
+  - JSON object containing information about the item, including the prices.
+- **Failure (404):**
+  - If the requested item is not found in the pricelist.
+- **Failure (400):**
+  - Where 5021;6 is the SKU provided and there is an issue with fetching the key price from Prices.tf.
+#
+```plain text
+GET /api/
+```
+Retrieves the entire pricelist.
+
+**Response:**
+- **Success (200):**
+  - JSON object containing the entire pricelist.
+- **Failure (400):**
+  - If there is an issue loading the pricelist.
+#
+```plain text
+POST /api/:sku
+```
+An endpoint that returns a status code of 200 for each request. Exists so there's no issue in integrating with TF2 Auto Bot.
+
+**Request:**
+- **Parameters:**
+  - `sku` (String): The Stock Keeping Unit of the item.
+
+**Response:**
+- **Success (200):**
+  - JSON object indicating the SKU.
+#
+```plain text
+POST /api/add/:name
+```
+Adds the item to the list of items to auto price.
+
+**Request:**
+- **Parameters:**
+  - `name` (String): The name of the item to add.
+
+**Response:**
+- **Success (200):**
+  - Item successfully added. Will now be automatically priced.
+- **Failure (400):**
+  - If the item already exists in the item list.
+#
+```plain text
+POST /api/delete/:name
+```
+Deletes an item from the list of items to automatically price.
+
+**Request:**
+- **Parameters:**
+  - `name` (String): The name of the item to delete.
+
+**Response:**
+- **Success (200):**
+  - Item successfully deleted.
+- **Failure (400):**
+  - If the item does not exist in the item list.
+    
 ## Running the Auto Pricer
 Once all the requirements have been met, and you have provided the values required in config.json, simply run:
 ```
