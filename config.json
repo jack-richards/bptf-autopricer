@@ -1,0 +1,19 @@
+{
+    "bptfAPIKey": "your bptf api key",
+    "bptfToken": "your bptf token",
+    "steamAPIKey": "your steam api key",
+    "database": {
+        "schema": "tf2",
+        "host": "localhost",
+        "port": 5432,
+        "database": "backpacktf-ws",
+        "user": "postgres",
+        "password": "database password"
+    },
+    "pricerAPIPort": 3456,
+    "pricerSocketPort": 9850,
+    "maxPercentageDifferences": {
+        "buy": 5,
+        "sell": -8
+    }
+}
