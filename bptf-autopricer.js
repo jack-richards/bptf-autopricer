@@ -23,45 +23,13 @@ const schemaManager = new Schema({
 });
 
 // Steam IDs of bots that we want to ignore listings from.
-// This could be moved to a JSON file and read from there.
-const excludedSteamIds = [
-    '76561199384015307',
-    '76561199495073910',
-    '76561199222202498',
-    '76561199501640256',
-    '76561199501799493',
-    '76561199501799493',
-    '76561199501640256',
-    '76561199465040669',
-    '76561199468045911',
-    '76561198871163068',
-    '76561198274855163',
-    '76561199523234411',
-    '76561199500884711',
-    '76561199518117301',
-    '76561199181551276',
-    '76561198266870398',
-    '76561199402715445',
-    '76561198094818081',
-    '76561198068640262',
-    '76561198380634252'
-];
+const excludedSteamIds = config.excludedSteamIDs;
+
+// Steam IDs of bots that we want to prioritise listings from.
+const prioritySteamIds = config.trustedSteamIDs;
 
 // Listing descriptions that we want to ignore.
-// Similar to the above, this could be moved to
-// a JSON file and read from there.
-const excludedListingDescriptions = [
-    'exorcism',
-    'ex',
-    'spell',
-    'spells',
-    'spelled',
-    'footsteps',
-    'hh',
-    'horseshoes/rotten orange',
-    'headless horse',
-    'pumpkin bombs'
-];
+const excludedListingDescriptions = config.excludedListingDescriptions;
 
 // Create database instance for pg-promise.
 const pgp = require('pg-promise')({
@@ -476,18 +444,6 @@ const determinePrice = async (name, sku) => {
     });
 
     // TODO filter out listings that include painted hats.
-    // Could move this to a JSON file.
-    var prioritySteamIds = [
-        '76561199110778355',
-        '76561199057187154',
-        '76561198225717852',
-        '76561199118546232',
-        '76561198316831771',
-        '76561198428177474',
-        '76561199072654974',
-        '76561198453530349',
-        '76561198259733876'
-    ];
 
     // We prioritise using listings from bots in our prioritySteamIds list.
     // I.e., we move listings by those trusted steamids to the front of the
