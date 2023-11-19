@@ -235,10 +235,6 @@ const calculateAndEmitPrices = async () => {
     }
 };
 
-(async () => {
-    await calculateAndEmitPrices();
-})();
-
 setInterval(async () => {
     await calculateAndEmitPrices();
 }, 15 * 60 * 1000); // Every 15 minutes.
@@ -321,6 +317,9 @@ schemaManager.init(async function(err) {
     if (err) {
         throw err;
     }
+    // Calculate and emit prices on startup.
+    await calculateAndEmitPrices();
+    // Listen for events from the bptf socket.
     rws.addEventListener('message', event => {
         var json = JSON.parse(event.data);
         // forwards-compatible support of the batch mode, if you did not set the batch-test header.
