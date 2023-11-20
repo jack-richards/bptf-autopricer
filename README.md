@@ -91,6 +91,8 @@ Contains two fields, `buy` and `sell`. These values represent the maximum differ
 - A higher **buy** percentage means that the auto pricer is willing to buy items for a higher price than prices.tf.
 - A lower **sell** percentage means that the auto pricer is willing to sell items for a lower price than prices.tf.
   
+The default in the config is the settings I used while using this auto pricer with a trading bot.
+  
 ```JSON
 "maxPercentageDifferences": {
   "buy": 5,
@@ -113,7 +115,7 @@ A list of Steam ID 64s used to prioritise listings owned by these IDs over other
 ```JSON
 "trustedSteamIDs": [
     "76561199110778355"
-],
+]
 ```
 
 ### `excludedListingDescriptions`
@@ -125,10 +127,32 @@ A list of descriptions that, when detected within a listing's details, causes th
 ]
 ```
 
-## API Routes
-Here I'll highlight the different API routes you can make queries to, and what responses you can expect to receive.\
-Please note that the API runs locally (localhost) on the port defined in `config.json` in the `pricerAPIPort` key.
+## API Routes & Socket IO
+The socket io server will emit events called 'price' with an item object as the value. The item objects are structured like the following:
+```JSON
+{
+  "name": "Strange Australium Minigun",
+  "sku": "202;11;australium",
+  "source": "bptf",
+  "time": 1700403492,
+  "buy": {
+    "keys": 25,
+    "metal": 21.33
+  },
+  "sell": {
+    "keys": 26,
+    "metal": 61.77
+  }
+}
+```
+- Note that the same JSON structure is used when an item or an array of items is returned by the API.
+- This JSON format is fully compatible with what [TF2 Auto Bot](https://github.com/TF2Autobot/tf2autobot) requires for a custom pricer implementation.
+  
 #
+Now I'll highlight the different API routes you can make queries to, and what responses you can expect to receive.\
+Please note that both the Socket IO server and API run locally (localhost) on the ports defined in `config.json`.
+#
+
 ```plain text
 GET /api/:sku
 ```
@@ -140,7 +164,7 @@ Retrieves a particular item object from the pricelist using the Stock Keeping Un
 
 **Response:**
 - **Success (200):**
-  - JSON object containing information about the item, including the prices.
+  - JSON item object containing information about the item, including the prices.
 - **Failure (404):**
   - If the requested item is not found in the pricelist.
 - **Failure (400):**
@@ -153,7 +177,7 @@ Retrieves the entire pricelist.
 
 **Response:**
 - **Success (200):**
-  - JSON object containing the entire pricelist.
+  - JSON object containing the entire pricelist. An array of JSON item objects.
 - **Failure (400):**
   - If there is an issue loading the pricelist.
 #
