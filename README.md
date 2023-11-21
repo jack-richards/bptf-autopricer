@@ -37,10 +37,11 @@ An open-source solution that generates item prices for selected items by utilisi
 
 ## Requirements
 - Install dependencies by running npm install in the project directory with package.json.
-- A PostgreSQL database is required. Create a database and schema according to your preferences and specify them in the config.json file.
-- The PostgreSQL table named listings must be created. Use the following SQL statement:
+- A PostgreSQL database is required. You have **two** options in setting this up.
+  1. Keep the default options for the database in `config.json` and follow along with the tutorial provided in [INITIALIZE-DB.md](https://github.com/jack-richards/bptf-autopricer/blob/main/INITIALIZE-DB.md) to satisfy all the database requirements. 
+  2. Create a database and schema according to your preferences and specify them in `config.json`. A table named listings must be created using the following SQL statement:
 ```sql
-CREATE TABLE listings (
+CREATE TABLE your_schema_name.listings (
     name character varying NOT NULL,
     sku character varying NOT NULL,
     currencies json NOT NULL,
@@ -50,7 +51,7 @@ CREATE TABLE listings (
     CONSTRAINT listings_pkey PRIMARY KEY (name, sku, intent, steamid)
 );
 ```
-Make sure to specify the database name, schema, user, and other relevant details in the `config.json` file.
+Regardless of the option you choose. Make sure you have properly specified the database name, schema, user, and other relevant details that you are using in the `config.json` file.
 
 ## Configuration
 To configure the application you need to specify the values for all the fields in `config.json`.
@@ -63,7 +64,7 @@ To configure the application you need to specify the values for all the fields i
         "schema": "tf2",
         "host": "localhost",
         "port": 5432,
-        "name": "backpacktf-ws",
+        "name": "bptf-autopricer",
         "user": "postgres",
         "password": "database password"
     },
