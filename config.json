@@ -6,7 +6,7 @@
         "schema": "tf2",
         "host": "localhost",
         "port": 5432,
-        "name": "backpacktf-ws",
+        "name": "bptf-autopricer",
         "user": "postgres",
         "password": "database password"
     },
