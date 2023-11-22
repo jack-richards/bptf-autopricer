@@ -6,5 +6,6 @@ If you want to use the default database settings as provided in the config.json 
    - If it asks for a password, make sure you note it down as you will need to set the password in `config.json` once you are done here.
 4. Type CREATE DATABASE "bptf-autopricer"; and hit enter.
 5. Type \c "bptf-autopricer" and hit enter
-6. Type \i path/to/initalize-db.sql and hit enter
+6. Type \i path/to/initialize-db.sql and hit enter
+   - path/to/ is a placeholder and should be replaced with the full path to get to the initialize-db.sql file.
 7. The database should now be ready for the application to use.
