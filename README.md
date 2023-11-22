@@ -36,7 +36,7 @@ An open-source solution that generates item prices for selected items by utilisi
   - Prices are stored and emitted in a format fully supported by the [TF2 Auto Bot](https://github.com/TF2Autobot/tf2autobot) custom-pricer interface.
 
 ## Requirements
-- Install dependencies by running npm install in the project directory with package.json.
+- Install dependencies by running `npm install` in the project directory with package.json.
 - A PostgreSQL database is required. You have **two** options in setting this up.
   1. Keep the default options for the database in `config.json` and follow along with the tutorial provided in [INITIALIZE-DB.md](https://github.com/jack-richards/bptf-autopricer/blob/main/INITIALIZE-DB.md) to satisfy all the database requirements. 
   2. Create a database and schema according to your preferences and specify them in `config.json`. A table named listings must be created using the following SQL statement:
@@ -229,4 +229,9 @@ Deletes an item from the list of items to automatically price.
 Once all the requirements have been met, and you have provided the values required in config.json, simply run:
 ```
 node bptf-autopricer.js
+```
+
+If you want to use [PM2](https://github.com/Unitech/pm2) to run the application even after closing the terminal run:
+```
+pm2 start bptf-autopricer.js
 ```
