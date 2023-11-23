@@ -68,8 +68,7 @@ To configure the application you need to specify the values for all the fields i
         "user": "postgres",
         "password": "database password"
     },
-    "pricerAPIPort": 3456,
-    "pricerSocketPort": 9850,
+    "pricerPort": 3456,
     "maxPercentageDifferences": {
         "buy": 5,
         "sell": -8
@@ -151,7 +150,7 @@ The socket io server will emit events called 'price' with an item object as the 
   
 #
 Now I'll highlight the different API routes you can make queries to, and what responses you can expect to receive.\
-Please note that both the Socket IO server and API run locally (localhost) on the ports defined in `config.json`.
+Please note that both the Socket IO server and API run locally (localhost) on the port defined in `config.json`.
 #
 
 ```plain text
