@@ -10,8 +10,7 @@
         "user": "postgres",
         "password": "database password"
     },
-    "pricerAPIPort": 3456,
-    "pricerSocketPort": 9850,
+    "pricerPort": 3456,
     "maxPercentageDifferences": {
         "buy": 5,
         "sell": -8
