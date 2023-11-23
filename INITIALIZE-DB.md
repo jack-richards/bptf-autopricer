@@ -11,3 +11,5 @@ If you want to use the default database settings as provided in the config.json 
 6. Type \i path/to/initialize-db.sql and hit enter
    - path/to/ is a placeholder and should be replaced with the full path to get to the initialize-db.sql file.
 7. The database should now be ready for the application to use.
+
+A common issue faced when following these steps on Linux is having `initialize-db.sql` inside a protected directory, like /home or one of its sub-directories. Preventing the postgres user from being able to access the file. To remedy this, move the `initialize-db.sql` file to a directory without protection, like `/tmp`, this should allow psql to read the file as intended.
