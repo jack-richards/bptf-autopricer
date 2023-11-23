@@ -14,8 +14,7 @@ const SCHEMA_PATH = './schema.json';
 const PRICELIST_PATH = './files/pricelist.json';
 const ITEM_LIST_PATH = './files/item_list.json';
 
-const socket = require('./API/socket.js');
-const API = require('./API/server.js');
+const { listen, socketIO } = require('./API/server.js');
 
 // Steam API key is required for the schema manager to work.
 const schemaManager = new Schema({
@@ -97,7 +96,7 @@ var external_pricelist;
         metal: key_item.sell.metal
     };
     // Emit new key price.
-    socket.socketIO.emit('price', key_item);
+    socketIO.emit('price', key_item);
     // Get external pricelist.
     external_pricelist = await Methods.getExternalPricelist();
 })();
@@ -110,7 +109,7 @@ setInterval(async () => {
             metal: key_item.sell.metal
         };
         // Emit new key price.
-        socket.socketIO.emit('price', key_item);
+        socketIO.emit('price', key_item);
     } catch (e) {
         console.error(e);
     }
@@ -199,7 +198,7 @@ const calculateAndEmitPrices = async () => {
     for (const item of item_objects) {
         // Emit item object.
         await Methods.waitXSeconds(0.3);
-        socket.socketIO.emit('price', item);
+        socketIO.emit('price', item);
     }
 };
 
@@ -699,5 +698,4 @@ const finalisePrice = (arr, name, sku) => {
     }
 };
 
-// Start API.
-API.listen();
+listen();
