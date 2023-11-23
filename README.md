@@ -155,7 +155,7 @@ Please note that both the Socket IO server and API run locally (localhost) on th
 #
 
 ```plain text
-GET /api/:sku
+GET /items/:sku
 ```
 Retrieves a particular item object from the pricelist using the Stock Keeping Unit (SKU) provided. Item object returned contains the prices for the item.
 
@@ -172,7 +172,7 @@ Retrieves a particular item object from the pricelist using the Stock Keeping Un
   - Where 5021;6 is the SKU provided and there is an issue with fetching the key price from Prices.tf.
 #
 ```plain text
-GET /api/
+GET /items/
 ```
 Retrieves the entire pricelist.
 
@@ -183,7 +183,7 @@ Retrieves the entire pricelist.
   - If there is an issue loading the pricelist.
 #
 ```plain text
-POST /api/:sku
+POST /items/:sku
 ```
 An endpoint that returns a status code of 200 for each request. Exists so there's no issue in integrating with TF2 Auto Bot.
 
@@ -196,7 +196,7 @@ An endpoint that returns a status code of 200 for each request. Exists so there'
   - JSON object indicating the SKU.
 #
 ```plain text
-POST /api/add/:name
+POST /items/add/:name
 ```
 Adds the item to the list of items to auto price.
 
@@ -211,7 +211,7 @@ Adds the item to the list of items to auto price.
   - If the item already exists in the item list.
 #
 ```plain text
-POST /api/delete/:name
+POST /items/delete/:name
 ```
 Deletes an item from the list of items to automatically price.
 
