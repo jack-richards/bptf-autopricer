@@ -237,10 +237,13 @@ function handleEvent(e) {
                     return;
                 }
 
-                // Check to make sure currencies object only contains "metal" and "keys".
+                // Make sure currencies object contains at least one key related to metal or keys.
                 if (!Methods.validateObject(currencies)) {
                     return;
                 }
+
+                // Create a currencies object that contains only metal and keys.
+                currencies = Methods.createCurrencyObject(currencies);
 
                 // Filter out listing if it's owned by blacklisted ID.
                 if (!excludedSteamIds.some(id => steamid === id)) {
@@ -367,7 +370,8 @@ const insertListings = async (unformattedListings, sku, name) => {
                 // Skip this listing.
                 continue;
             }
-            formattedListing.currencies = JSON.stringify(listing.currencies);
+            let validatedCurrencies = Methods.createCurrencyObject(listing.currencies);
+            formattedListing.currencies = JSON.stringify(validatedCurrencies);
             formattedListing.intent = listing.intent;
             formattedListing.updated = updated;
             formattedListing.steamid = listing.steamid;
@@ -382,8 +386,8 @@ const insertListings = async (unformattedListings, sku, name) => {
             const query =
                 pgp.helpers.insert(formattedListings, cs, 'listings') +
                 ` ON CONFLICT (name, sku, intent, steamid)\
-            DO UPDATE SET currencies = excluded.currencies, updated = excluded.updated\
-            WHERE excluded.updated > listings.updated;`;
+                DO UPDATE SET currencies = excluded.currencies, updated = excluded.updated\
+                WHERE excluded.updated > listings.updated;`;
 
             await db.none(query);
         }

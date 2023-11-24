@@ -148,12 +148,35 @@ Methods.prototype.waitXSeconds = async function(seconds) {
 };
 
 Methods.prototype.validateObject = function(obj) {
-    if (Object.keys(obj).length !== 2 || !obj.hasOwnProperty('metal') || !obj.hasOwnProperty('keys')) {
-        // The object contains unexpected keys or is missing the expected key.
+    if(Object.keys(obj).length > 0) {
+        if(obj.hasOwnProperty('keys') || obj.hasOwnProperty('metal')) {
+            // The object is valid as it contains at least one expected key.
+            return true;
+        } else {
+            // The object is invalid as it doesn't contain any expected keys.
+            return false;
+        }
+    } else {
+        // The object is empty.
         return false;
     }
-    // The object is valid and only contains the expected key.
-    return true;
+};
+
+Methods.prototype.createCurrencyObject = function(obj) {
+    let newObj = {
+        keys: 0,
+        metal: 0
+    };
+
+    if (obj.hasOwnProperty('keys')) {
+        newObj.keys = obj.keys;
+    }
+
+    if (obj.hasOwnProperty('metal')) {
+        newObj.metal = obj.metal;
+    }
+
+    return newObj;
 };
 
 const comparePrices = (item1, item2) => {
