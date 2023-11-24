@@ -2,6 +2,8 @@ var Methods = function() {};
 var fs = require('fs');
 
 const axios = require('axios');
+const AsyncLock = require('async-lock');
+const lock = new AsyncLock();
 
 const config = require('./config.json');
 
@@ -160,6 +162,7 @@ const comparePrices = (item1, item2) => {
 
 Methods.prototype.addToPricelist = function(item, PRICELIST_PATH) {
     try {
+    lock.acquire('pricelist', () => {
         const data = fs.readFileSync(PRICELIST_PATH, 'utf8');
 
         // Parse the existing JSON content into a JavaScript object
@@ -200,6 +203,7 @@ Methods.prototype.addToPricelist = function(item, PRICELIST_PATH) {
 
         // Write the updated JSON back to the file synchronously
         fs.writeFileSync(PRICELIST_PATH, updatedData, 'utf8');
+    });
     } catch (error) {
         console.error('Error:', error);
     }

@@ -92,6 +92,8 @@ var external_pricelist;
 // So we leave any potential thrown errors unhandled.
 (async () => {
     var key_item = await Methods.getKeyFromExternalAPI();
+    // Save item to pricelist. Pricelist.json is mainly used by the pricing API.
+    Methods.addToPricelist(key_item, PRICELIST_PATH);
     keyobj = {
         metal: key_item.sell.metal
     };
@@ -105,6 +107,8 @@ var external_pricelist;
 setInterval(async () => {
     try {
         var key_item = await Methods.getKeyFromExternalAPI();
+        // Save item to pricelist. Pricelist.json is mainly used by the pricing API.
+        Methods.addToPricelist(key_item, PRICELIST_PATH);
         keyobj = {
             metal: key_item.sell.metal
         };
