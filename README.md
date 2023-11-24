@@ -239,3 +239,5 @@ pm2 start bptf-autopricer.js
 - **Using the API Routes:** Send requests to the relevant route specified in the [API section](#api-routes--socket-io).
 - **For TF2 Auto Bot Users:** You have the option to copy the contents of the bot's `pricelist.json` into the [`item_list.json`](https://github.com/jack-richards/bptf-autopricer/blob/main/files/item_list.json) file within the `items` array.
 
+Each item name given should be the same as the one used for its listings on [backpack.tf](https://backpack.tf/). For example, `Non-Craftable Tour of Duty Ticket` **NOT** `Uncraftable Tour of Duty Ticket`.
+
