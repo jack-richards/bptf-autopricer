@@ -510,6 +510,9 @@ const filterOutliers = listingsArray => {
         return zScore <= 3 && zScore >= -3;
     });
 
+    if(filteredListings.length < 3) {
+        throw new Error('Not enough listings after filtering outliers.');
+    }
     // Get the first 3 buy listings from the filtered listings and calculate the mean.
     // The listings here should be free of outliers. It's also sorted in order of
     // trusted steamids (when applicable).
