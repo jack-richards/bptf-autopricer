@@ -148,6 +148,10 @@ Methods.prototype.waitXSeconds = async function(seconds) {
 };
 
 Methods.prototype.validateObject = function(obj) {
+    // Check if the object is undefined, empty etc.
+    if(!obj) {
+        return false;
+    }
     if(Object.keys(obj).length > 0) {
         if(obj.hasOwnProperty('keys') || obj.hasOwnProperty('metal')) {
             // The object is valid as it contains at least one expected key.

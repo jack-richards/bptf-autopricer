@@ -232,11 +232,6 @@ function handleEvent(e) {
                     return;
                 }
 
-                // If metal or keys isn't present, return.
-                if (!currencies?.metal || !currencies?.keys) {
-                    return;
-                }
-
                 // Make sure currencies object contains at least one key related to metal or keys.
                 if (!Methods.validateObject(currencies)) {
                     return;
