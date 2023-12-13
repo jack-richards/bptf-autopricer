@@ -338,6 +338,8 @@ Methods.prototype.getKeyFromExternalAPI = async function() {
                     Object.is(response.data.buyHalfScrap, undefined) ? 0 : response.data.buyHalfScrap
                 );
 
+                buyMetal = this.getRight(buyMetal);
+
                 key_object.buy = {
                     keys: buyKeys,
                     metal: buyMetal
@@ -348,6 +350,8 @@ Methods.prototype.getKeyFromExternalAPI = async function() {
                 let sellMetal = this.halfScrapToRefined(
                     Object.is(response.data.sellHalfScrap, undefined) ? 0 : response.data.sellHalfScrap
                 );
+
+                sellMetal = this.getRight(sellMetal);
 
                 key_object.sell = {
                     keys: sellKeys,
