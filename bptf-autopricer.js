@@ -88,9 +88,7 @@ schemaManager.on('schema', function(schema) {
 var keyobj;
 var external_pricelist;
 
-// Initial call to get key price and external pricelist. If this throws an error we want to trigger a shutdown and then restart.
-// So we leave any potential thrown errors unhandled.
-(async () => {
+const updateKeyObject = async () => {
     var key_item = await Methods.getKeyFromExternalAPI();
     // Save item to pricelist. Pricelist.json is mainly used by the pricing API.
     Methods.addToPricelist(key_item, PRICELIST_PATH);
@@ -99,34 +97,7 @@ var external_pricelist;
     };
     // Emit new key price.
     socketIO.emit('price', key_item);
-    // Get external pricelist.
-    external_pricelist = await Methods.getExternalPricelist();
-})();
-
-// Get key price every 3 minutes.
-setInterval(async () => {
-    try {
-        var key_item = await Methods.getKeyFromExternalAPI();
-        // Save item to pricelist. Pricelist.json is mainly used by the pricing API.
-        Methods.addToPricelist(key_item, PRICELIST_PATH);
-        keyobj = {
-            metal: key_item.sell.metal
-        };
-        // Emit new key price.
-        socketIO.emit('price', key_item);
-    } catch (e) {
-        console.error(e);
-    }
-}, 3 * 60 * 1000);
-
-// Get external pricelist once per 30 mins.
-setInterval(async () => {
-    try {
-        external_pricelist = await Methods.getExternalPricelist();
-    } catch (e) {
-        console.error(e);
-    }
-}, 30 * 60 * 1000);
+}
 
 const rws = new ReconnectingWebSocket('wss://ws.backpack.tf/events/', undefined, {
     WebSocket: ws,
@@ -206,10 +177,6 @@ const calculateAndEmitPrices = async () => {
     }
 };
 
-setInterval(async () => {
-    await calculateAndEmitPrices();
-}, 15 * 60 * 1000); // Every 15 minutes.
-
 function handleEvent(e) {
     // Only process relevant events.
     if (allowedItemNames.has(e.payload.item.name)) {
@@ -286,8 +253,13 @@ schemaManager.init(async function(err) {
     if (err) {
         throw err;
     }
+    // Update key object.
+    await updateKeyObject();
+    // Get external pricelist.
+    external_pricelist = await Methods.getExternalPricelist();
     // Calculate and emit prices on startup.
     await calculateAndEmitPrices();
+
     // Listen for events from the bptf socket.
     rws.addEventListener('message', event => {
         var json = JSON.parse(event.data);
@@ -298,6 +270,30 @@ schemaManager.init(async function(err) {
             handleEvent(json); // old event-per-frame message format - DEPRECATED!
         }
     });
+    
+    // Set-up timers for updating key-object, external pricelist and creating prices from listing data.
+    // Get external pricelist every 30 mins.
+    setInterval(async () => {
+        try {
+            external_pricelist = await Methods.getExternalPricelist();
+        } catch (e) {
+            console.error(e);
+        }
+    }, 30 * 60 * 1000);
+
+    // Update key object every 3 minutes.
+    setInterval(async () => {
+        try {
+            await updateKeyObject();
+        } catch (e) {
+            console.error(e);
+        }
+    }, 3 * 60 * 1000);
+
+    // Calculate prices using listing data every 15 minutes.
+    setInterval(async () => {
+        await calculateAndEmitPrices();
+    }, 15 * 60 * 1000); // Every 15 minutes.
 });
 
 const getListings = async (name, intent) => {
