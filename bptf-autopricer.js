@@ -351,6 +351,18 @@ const insertListings = async (unformattedListings, sku, name) => {
                 continue;
             }
 
+            // The item object where paint and stuff is stored.
+            const listingItemObject = listing.item;
+
+            if (listingItemObject.attributes) {
+                for (const attribute of listingItemObject.attributes) {
+                    if (attribute.value && Object.values(blockedAttributes).includes(attribute.value) &&
+                        !Object.keys(blockedAttributes).includes(name)) {
+                        return;  // Skip this listing. Listing is for a painted item.
+                    }
+                }
+            }
+
             // If userAgent field is not present, continue.
             // This indicates that the listing was not created by a bot.
             if (!listing.userAgent) {
