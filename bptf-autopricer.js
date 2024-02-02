@@ -358,7 +358,7 @@ const insertListings = async (unformattedListings, sku, name) => {
                 for (const attribute of listingItemObject.attributes) {
                     if (attribute.value && Object.values(blockedAttributes).includes(attribute.value) &&
                         !Object.keys(blockedAttributes).includes(name)) {
-                        return;  // Skip this listing. Listing is for a painted item.
+                        continue;  // Skip this listing. Listing is for a painted item.
                     }
                 }
             }
