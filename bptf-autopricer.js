@@ -30,6 +30,9 @@ const prioritySteamIds = config.trustedSteamIDs;
 // Listing descriptions that we want to ignore.
 const excludedListingDescriptions = config.excludedListingDescriptions;
 
+// Blocked attributes that we want to ignore. (Paints, parts, etc.)
+const blockedAttributes = config.blockedAttributes;
+
 // Create database instance for pg-promise.
 const pgp = require('pg-promise')({
     schema: config.database.schema
@@ -187,6 +190,7 @@ function handleEvent(e) {
             case 'listing-update':
                 let currencies = e.payload.currencies;
                 let listingDetails = e.payload.details;
+                let listingItemObject = e.payload.item; // The item object where paint and stuff is stored.
 
                 // Ignore keys. We price those using prices.tf.
                 if (response_item.name === 'Mann Co. Supply Crate Key') {
@@ -202,6 +206,18 @@ function handleEvent(e) {
                 // Make sure currencies object contains at least one key related to metal or keys.
                 if (!Methods.validateObject(currencies)) {
                     return;
+                }
+
+                // Filter out painted items.
+                if (listingItemObject.attributes && listingItemObject.attributes.some(attribute => {
+                    return typeof attribute === 'object' && // Ensure the attribute is an object.
+                        attribute.float_value &&  // Ensure the attribute has a float_value.
+                        // Check if the float_value is in the blockedAttributes object.
+                        Object.values(blockedAttributes).map(String).includes(String(attribute.float_value)) &&
+                        // Ensure the name of the item doesn't include any of the keys in the blockedAttributes object.
+                        !Object.keys(blockedAttributes).some(key => name.includes(key));
+                })) {
+                    return;  // Skip this listing. Listing is for a painted item.
                 }
 
                 // Create a currencies object that contains only metal and keys.
@@ -331,6 +347,21 @@ const insertListings = async (unformattedListings, sku, name) => {
             ) {
                 // Skip this listing. Listing is for a spelled item.
                 continue;
+            }
+
+            // The item object where paint and stuff is stored.
+            const listingItemObject = listing.item;
+
+            // Filter out painted items.
+            if (listingItemObject.attributes && listingItemObject.attributes.some(attribute => {
+                return typeof attribute === 'object' && // Ensure the attribute is an object.
+                    attribute.float_value &&  // Ensure the attribute has a float_value.
+                    // Check if the float_value is in the blockedAttributes object.
+                    Object.values(blockedAttributes).map(String).includes(String(attribute.float_value)) &&
+                    // Ensure the name of the item doesn't include any of the keys in the blockedAttributes object.
+                    !Object.keys(blockedAttributes).some(key => name.includes(key));
+            })) {
+                continue;  // Skip this listing. Listing is for a painted item.
             }
 
             // If userAgent field is not present, continue.
