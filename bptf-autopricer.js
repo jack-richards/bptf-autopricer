@@ -208,18 +208,16 @@ function handleEvent(e) {
                     return;
                 }
 
-                // Filter out painted items
-                if (listingItemObject.attributes) {
-                    // Loop through each attribute of the item, and check if any o each is a paint
-                    for (const attribute of listingItemObject.attributes) {
-                        // Check if value exists
-                        if (attribute.value) {
-                            if (Object.values(blockedAttributes).includes(attribute.value) &&
-                                !Object.keys(blockedAttributes).includes(response_item.name)) {
-                                return;  // Skip this listing. Listing is for a painted item.
-                            }
-                        }
-                    }
+                // Filter out painted items.
+                if (listingItemObject.attributes && listingItemObject.attributes.some(attribute => {
+                    return typeof attribute === 'object' && // Ensure the attribute is an object.
+                        attribute.float_value &&  // Ensure the attribute has a float_value.
+                        // Check if the float_value is in the blockedAttributes object.
+                        Object.values(blockedAttributes).map(String).includes(String(attribute.float_value)) &&
+                        // Ensure the name of the item doesn't include any of the keys in the blockedAttributes object.
+                        !Object.keys(blockedAttributes).some(key => name.includes(key));
+                })) {
+                    return;  // Skip this listing. Listing is for a painted item.
                 }
 
                 // Create a currencies object that contains only metal and keys.
@@ -354,13 +352,16 @@ const insertListings = async (unformattedListings, sku, name) => {
             // The item object where paint and stuff is stored.
             const listingItemObject = listing.item;
 
-            if (listingItemObject.attributes) {
-                for (const attribute of listingItemObject.attributes) {
-                    if (attribute.value && Object.values(blockedAttributes).includes(attribute.value) &&
-                        !Object.keys(blockedAttributes).includes(name)) {
-                        continue;  // Skip this listing. Listing is for a painted item.
-                    }
-                }
+            // Filter out painted items.
+            if (listingItemObject.attributes && listingItemObject.attributes.some(attribute => {
+                return typeof attribute === 'object' && // Ensure the attribute is an object.
+                    attribute.float_value &&  // Ensure the attribute has a float_value.
+                    // Check if the float_value is in the blockedAttributes object.
+                    Object.values(blockedAttributes).map(String).includes(String(attribute.float_value)) &&
+                    // Ensure the name of the item doesn't include any of the keys in the blockedAttributes object.
+                    !Object.keys(blockedAttributes).some(key => name.includes(key));
+            })) {
+                continue;  // Skip this listing. Listing is for a painted item.
             }
 
             // If userAgent field is not present, continue.
