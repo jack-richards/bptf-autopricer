@@ -158,7 +158,7 @@ const countListingsForItem = async (name) => {
     }
 };
 
-const updateFromSnapshot = async (name) => {
+const updateFromSnapshot = async (name, sku) => {
     // Check if always call snapshot API setting is enabled.
     if (!alwaysQuerySnapshotAPI) {
         // Check if required number of listings already exist in database for item.
@@ -191,7 +191,7 @@ const calculateAndEmitPrices = async () => {
             // Delete old listings from database.
             await deleteOldListings();
             // Use snapshot API to populate database with listings for item.
-            await updateFromSnapshot();
+            await updateFromSnapshot(name, sku);
             // Start process of pricing item.
             let arr = await determinePrice(name, sku);
             let item = finalisePrice(arr, name, sku);
