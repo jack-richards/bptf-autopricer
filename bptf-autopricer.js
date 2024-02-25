@@ -163,7 +163,7 @@ const updateFromSnapshot = async (name, sku) => {
     if (!alwaysQuerySnapshotAPI) {
         // Check if required number of listings already exist in database for item.
         // If not we need to query the snapshots API.
-        let callSnapshot = countListingsForItem(name);
+        let callSnapshot = await countListingsForItem(name);
         if(callSnapshot) {
             // Get listings from snapshot API.
             let unformatedListings = await Methods.getListingsFromSnapshots(name);
