@@ -33,6 +33,8 @@ const excludedListingDescriptions = config.excludedListingDescriptions;
 // Blocked attributes that we want to ignore. (Paints, parts, etc.)
 const blockedAttributes = config.blockedAttributes;
 
+const alwaysQuerySnapshotAPI = config.alwaysQuerySnapshotAPI;
+
 // Create database instance for pg-promise.
 const pgp = require('pg-promise')({
     schema: config.database.schema
@@ -138,6 +140,44 @@ rws.addEventListener('open', event => {
     console.log('Connected to socket.');
 });
 
+const countListingsForItem = async (name) => {
+    try {
+        const result = await db.one(`
+            SELECT 
+                COUNT(*) FILTER (WHERE intent = 'sell') AS sell_count,
+                COUNT(*) FILTER (WHERE intent = 'buy') AS buy_count
+            FROM listings
+            WHERE name = $1;
+        `, [name]);
+
+        const { sell_count, buy_count } = result;
+        return sell_count >= 1 && buy_count >= 10;
+    } catch (error) {
+        console.error("Error counting listings:", error);
+        throw error;
+    }
+};
+
+const updateFromSnapshot = async (name) => {
+    // Check if always call snapshot API setting is enabled.
+    if (!alwaysQuerySnapshotAPI) {
+        // Check if required number of listings already exist in database for item.
+        // If not we need to query the snapshots API.
+        let callSnapshot = countListingsForItem(name);
+        if(callSnapshot) {
+            // Get listings from snapshot API.
+            let unformatedListings = await Methods.getListingsFromSnapshots(name);
+            // Insert snapshot listings.
+            await insertListings(unformatedListings, sku, name);
+        }
+    } else {
+        // Get listings from snapshot API.
+        let unformatedListings = await Methods.getListingsFromSnapshots(name);
+        // Insert snapshot listings.
+        await insertListings(unformatedListings, sku, name);
+    }
+}
+
 const calculateAndEmitPrices = async () => {
     let item_objects = [];
     for (const name of allowedItemNames) {
@@ -148,12 +188,11 @@ const calculateAndEmitPrices = async () => {
             }
             // Get sku of item via the item name.
             let sku = schemaManager.schema.getSkuFromName(name);
-            // Get listings from snapshot API.
-            let unformatedListings = await Methods.getListingsFromSnapshots(name);
-            // Insert snapshot listings.
-            await insertListings(unformatedListings, sku, name);
-            // Now we have the latest snapshot data we start to determine
-            // the price of the item.
+            // Delete old listings from database.
+            await deleteOldListings();
+            // Use snapshot API to populate database with listings for item.
+            await updateFromSnapshot();
+            // Start process of pricing item.
             let arr = await determinePrice(name, sku);
             let item = finalisePrice(arr, name, sku);
             // If the item is undefined, we skip it.

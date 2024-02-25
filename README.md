@@ -73,6 +73,7 @@ To configure the application you need to specify the values for all the fields i
         "buy": 5,
         "sell": -8
     },
+    "alwaysQuerySnapshotAPI": true,
     "excludedSteamIDs": [
         "76561199384015307"
     ],
@@ -125,6 +126,32 @@ A list of descriptions that, when detected within a listing's details, causes th
 "excludedListingDescriptions": [
     "exorcism",
 ]
+```
+
+### `alwaysQuerySnapshotAPI``
+
+This setting determines whether the pricer should consistently call the snapshot API for each item during the pricing process, regardless of the number of listings available in the database. By default, this setting is set to `true`.
+
+#### Behavior:
+
+- **true**: The pricer always calls the snapshot API for every item, ensuring the most up-to-date information. However, this may result in slower pricing processes due to the API rate limits.
+
+- **false**: The pricer avoids unnecessary API calls if there are already a suitable number of listings in the database to generate a price. This speeds up the pricing process significantly as it bypasses the need to call the snapshot API. However, there are trade-offs to consider:
+
+#### Trade-offs:
+
+1. **Accuracy vs. Speed**: By setting `alwaysQuerySnapshotAPI` to `false`, the pricing process becomes faster but may use a smaller pool of listings to calculate prices. The logic ensures that if there are at least 10 buy listings and 1 sell listing, no further data retrieval is attempted.
+
+2. **Timeliness of Data**: When the API is not called every time, there's a risk of using listings with prices that are up to approximately 35 minutes old, in the worst-case scenario.
+
+#### Benefits:
+
+- **Improved Performance**: Setting `alwaysQuerySnapshotAPI` to `false` makes the pricer more efficient, especially when dealing with large item lists, as it avoids the minimum 2-second wait time per item.
+
+Consider your requirements for pricing accuracy, speed, and data freshness when configuring this setting.
+
+```JSON
+"alwaysQuerySnapshotAPI": true
 ```
 
 ## API Routes & Socket IO
@@ -240,4 +267,3 @@ pm2 start bptf-autopricer.js
 - **Manual Additions:** Add items to price manually to [`item_list.json`](https://github.com/jack-richards/bptf-autopricer/blob/main/files/item_list.json). Make sure to use the valid format shown.
 
 Each item name given should be the same as the one used for its listings on [backpack.tf](https://backpack.tf/). For example, `Non-Craftable Tour of Duty Ticket` **NOT** `Uncraftable Tour of Duty Ticket`.
-
