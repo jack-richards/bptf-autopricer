@@ -128,7 +128,7 @@ A list of descriptions that, when detected within a listing's details, causes th
 ]
 ```
 
-### `alwaysQuerySnapshotAPI``
+### `alwaysQuerySnapshotAPI`
 
 This setting determines whether the pricer should consistently call the snapshot API for each item during the pricing process, regardless of the number of listings available in the database. By default, this setting is set to `true`.
 
