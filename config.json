@@ -15,6 +15,7 @@
         "buy": 5,
         "sell": -8
     },
+    "alwaysQuerySnapshotAPI": true,
     "excludedSteamIDs": [
         "76561199384015307",
         "76561199495073910",
