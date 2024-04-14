@@ -585,7 +585,7 @@ const determinePrice = async (name, sku) => {
     });
 
     try {
-        let arr = getAverages(name, buyFiltered, sellFiltered, sku);
+        let arr = getAverages(name, buyFiltered, sellFiltered, sku, pricetfItem);
         return arr;
     } catch (e) {
         throw new Error(e);
