@@ -35,6 +35,8 @@ const blockedAttributes = config.blockedAttributes;
 
 const alwaysQuerySnapshotAPI = config.alwaysQuerySnapshotAPI;
 
+const fallbackOntoPricesTf = config.fallbackOntoPricesTf;
+
 // Create database instance for pg-promise.
 const pgp = require('pg-promise')({
     schema: config.database.schema
@@ -619,77 +621,95 @@ const getAverages = (name, buyFiltered, sellFiltered, sku) => {
         compare our average price to it's average price.`);
     }
 
-    if (buyFiltered.length < 3) {
-        throw new Error(`| UPDATING PRICES |: ${name} not enough buy listings...`);
-    } else if (buyFiltered.length > 3 && buyFiltered.length < 10) {
-        var totalValue = {
-            keys: 0,
-            metal: 0
-        };
-        for (var i = 0; i <= 2; i++) {
-            totalValue.keys += Object.is(buyFiltered[i].currencies.keys, undefined) ?
-                0 :
-                buyFiltered[i].currencies.keys;
-            totalValue.metal += Object.is(buyFiltered[i].currencies.metal, undefined) ?
-                0 :
-                buyFiltered[i].currencies.metal;
-        }
-        final_buyObj = {
-            keys: Math.trunc(totalValue.keys / i),
-            metal: totalValue.metal / i
-        };
-    } else {
-        // Filter out outliers from set, and calculate a mean average price in terms of metal value.
-        let filteredMean = filterOutliers(buyFiltered);
-        // Caclulate the maximum amount of keys that can be made with the metal value returned.
-        let keys = Math.trunc(filteredMean / keyobj.metal);
-        // Calculate the remaining metal value after the value of the keys has been removed.
-        let metal = Methods.getRight(filteredMean - keys * keyobj.metal);
-        // Create the final buy object.
-        final_buyObj = {
-            keys: keys,
-            metal: metal
-        };
-    }
-    // Decided to pick the very first sell listing as it's ordered by the lowest sell price. I.e., the most competitive.
-    // However, I decided to prioritise 'trusted' listings by certain steamids. This may result in a very high sell price, instead
-    // of a competitive one.
-    if (sellFiltered.length > 0) {
-        final_sellObj.keys = Object.is(sellFiltered[0].currencies.keys, undefined) ?
-            0 :
-            sellFiltered[0].currencies.keys;
-        final_sellObj.metal = Object.is(sellFiltered[0].currencies.metal, undefined) ?
-            0 :
-            sellFiltered[0].currencies.metal;
-    } else {
-        throw new Error(`| UPDATING PRICES |: ${name} not enough sell listings...`); // Not enough
-    }
-
-    var usePrices = false;
     try {
-        // Will return true or false. True if we are ok with the autopricers price, false if we are not.
-        // We use prices.tf as a baseline.
-        usePrices = Methods.calculatePricingAPIDifferences(pricetfItem, final_buyObj, final_sellObj, keyobj);
-    } catch (e) {
-        // Will create a log of this difference.
-        console.log(`Our autopricer determined that name ${name} should sell for : ${final_sellObj.keys} keys and 
-        ${final_sellObj.metal} ref, and buy for ${final_buyObj.keys} keys and ${final_buyObj.metal} ref. Prices.tf
-        determined I should sell for ${pricetfItem.sell.keys} keys and ${pricetfItem.sell.metal} ref, and buy for
-        ${pricetfItem.buy.keys} keys and ${pricetfItem.buy.metal} ref. Message returned by the method: ${e.message}`);
+        if (buyFiltered.length < 3) {
+            throw new Error(`| UPDATING PRICES |: ${name} not enough buy listings...`);
+        } else if (buyFiltered.length > 3 && buyFiltered.length < 10) {
+            var totalValue = {
+                keys: 0,
+                metal: 0
+            };
+            for (var i = 0; i <= 2; i++) {
+                totalValue.keys += Object.is(buyFiltered[i].currencies.keys, undefined) ?
+                    0 :
+                    buyFiltered[i].currencies.keys;
+                totalValue.metal += Object.is(buyFiltered[i].currencies.metal, undefined) ?
+                    0 :
+                    buyFiltered[i].currencies.metal;
+            }
+            final_buyObj = {
+                keys: Math.trunc(totalValue.keys / i),
+                metal: totalValue.metal / i
+            };
+        } else {
+            // Filter out outliers from set, and calculate a mean average price in terms of metal value.
+            let filteredMean = filterOutliers(buyFiltered);
+            // Caclulate the maximum amount of keys that can be made with the metal value returned.
+            let keys = Math.trunc(filteredMean / keyobj.metal);
+            // Calculate the remaining metal value after the value of the keys has been removed.
+            let metal = Methods.getRight(filteredMean - keys * keyobj.metal);
+            // Create the final buy object.
+            final_buyObj = {
+                keys: keys,
+                metal: metal
+            };
+        }
+        // Decided to pick the very first sell listing as it's ordered by the lowest sell price. I.e., the most competitive.
+        // However, I decided to prioritise 'trusted' listings by certain steamids. This may result in a very high sell price, instead
+        // of a competitive one.
+        if (sellFiltered.length > 0) {
+            final_sellObj.keys = Object.is(sellFiltered[0].currencies.keys, undefined) ?
+                0 :
+                sellFiltered[0].currencies.keys;
+            final_sellObj.metal = Object.is(sellFiltered[0].currencies.metal, undefined) ?
+                0 :
+                sellFiltered[0].currencies.metal;
+        } else {
+            throw new Error(`| UPDATING PRICES |: ${name} not enough sell listings...`); // Not enough
+        }
 
-        throw new Error(`| UPDATING PRICES |: ${name} pricing average generated by autopricer is too dramatically
-        different to one returned by prices.tf`);
-    }
+        var usePrices = false;
+        try {
+            // Will return true or false. True if we are ok with the autopricers price, false if we are not.
+            // We use prices.tf as a baseline.
+            usePrices = Methods.calculatePricingAPIDifferences(pricetfItem, final_buyObj, final_sellObj, keyobj);
+        } catch (e) {
+            // Will create a log of this difference.
+            console.log(`Our autopricer determined that name ${name} should sell for : ${final_sellObj.keys} keys and 
+            ${final_sellObj.metal} ref, and buy for ${final_buyObj.keys} keys and ${final_buyObj.metal} ref. Prices.tf
+            determined I should sell for ${pricetfItem.sell.keys} keys and ${pricetfItem.sell.metal} ref, and buy for
+            ${pricetfItem.buy.keys} keys and ${pricetfItem.buy.metal} ref. Message returned by the method: ${e.message}`);
 
-    // if-else statement probably isn't needed, but I'm just being cautious.
-    if (usePrices) {
-        // The final averages are returned here. But work is still needed to be done. We can't assume that the buy average is
-        // going to be lower than the sell average price. So we need to check for this later.
-        return [final_buyObj, final_sellObj];
-    } else {
-        throw new Error(`| UPDATING PRICES |: ${name} pricing average generated by autopricer is too dramatically
-        different to one returned by prices.tf`);
-    }
+            throw new Error(`| UPDATING PRICES |: ${name} pricing average generated by autopricer is too dramatically
+            different to one returned by prices.tf`);
+        }
+
+        // if-else statement probably isn't needed, but I'm just being cautious.
+        if (usePrices) {
+            // The final averages are returned here. But work is still needed to be done. We can't assume that the buy average is
+            // going to be lower than the sell average price. So we need to check for this later.
+            return [final_buyObj, final_sellObj];
+        } else {
+            throw new Error(`| UPDATING PRICES |: ${name} pricing average generated by autopricer is too dramatically
+            different to one returned by prices.tf`);
+        }
+    } catch (error) {
+        // If configured, we fallback onto prices.tf for the price.
+        if(fallbackOntoPricesTf) {
+            const final_buyObj = {
+                keys: pricetfItem.buy.keys,
+                metal: pricetfItem.buy.metal 
+            };
+            const final_sellObj = {
+                keys: pricetfItem.sell.keys,
+                metal: pricetfItem.sell.metal
+            };
+            return [final_buyObj, final_sellObj];
+        } else {
+            // We rethrow the error.
+            throw error;
+        }
+    };
 };
 
 const finalisePrice = (arr, name, sku) => {
