@@ -371,7 +371,7 @@ const insertListing = async (response_item, sku, currencies, intent, steamid) =>
 const insertListings = async (unformattedListings, sku, name) => {
     // If there are no listings from the snapshot just return. No update can be done.
     if (!unformattedListings) {
-        return;
+        throw new Error(`No listings found for ${name} in the snapshot. The name: '${name}' likely doesn't match the version on the items bptf listings page.`);
     }
     try {
         let formattedListings = [];
