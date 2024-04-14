@@ -369,6 +369,10 @@ const insertListing = async (response_item, sku, currencies, intent, steamid) =>
 };
 
 const insertListings = async (unformattedListings, sku, name) => {
+    // If there are no listings from the snapshot just return. No update can be done.
+    if (!unformattedListings) {
+        return;
+    }
     try {
         let formattedListings = [];
         const uniqueSet = new Set(); // Create a set to store unique combinations
