@@ -488,13 +488,50 @@ const determinePrice = async (name, sku) => {
     var buyListings = await getListings(name, 'buy');
     var sellListings = await getListings(name, 'sell');
 
-    // Check for undefined.
-    if (!buyListings || !sellListings) {
-        throw new Error(`| UPDATING PRICES |: ${name} not enough listings...`);
+
+    // Get the price of the item from the in-memory external pricelist.
+    var data;
+    try {
+        data = Methods.getItemPriceFromExternalPricelist(sku, external_pricelist);
+    } catch (e) {
+        throw new Error(`| UPDATING PRICES |: Couldn't price ${name}. Issue with Price.tf.`);
     }
 
-    if (buyListings.rowCount === 0 || sellListings.rowCount === 0) {
-        throw new Error(`| UPDATING PRICES |: ${name} not enough listings...`);
+    var pricetfItem = data.pricetfItem;
+
+    if (
+        (pricetfItem.buy.keys === 0 && pricetfItem.buy.metal === 0) ||
+        (pricetfItem.sell.keys === 0 && pricetfItem.sell.metal === 0)
+    ) {
+        throw new Error(`| UPDATING PRICES |: Couldn't price ${name}. Item is not priced on price.tf, therefore we can't
+        compare our average price to it's average price.`);
+    }
+
+
+    try {
+        // Check for undefined. No listings.
+        if (!buyListings || !sellListings) {
+            throw new Error(`| UPDATING PRICES |: ${name} not enough listings...`);
+        }
+
+        if (buyListings.rowCount === 0 || sellListings.rowCount === 0) {
+            throw new Error(`| UPDATING PRICES |: ${name} not enough listings...`);
+        }
+    } catch (e) {
+        if(fallbackOntoPricesTf) {
+            const final_buyObj = {
+                keys: pricetfItem.buy.keys,
+                metal: pricetfItem.buy.metal 
+            };
+            const final_sellObj = {
+                keys: pricetfItem.sell.keys,
+                metal: pricetfItem.sell.metal
+            };
+            // Return price.tf price.
+            return [final_buyObj, final_sellObj];
+        }
+        // If we don't fallback onto prices.tf, re-throw the error.
+        throw e;
     }
 
     // Sort buyListings into descending order of price.
@@ -592,7 +629,7 @@ const filterOutliers = listingsArray => {
     return filteredMean;
 };
 
-const getAverages = (name, buyFiltered, sellFiltered, sku) => {
+const getAverages = (name, buyFiltered, sellFiltered, sku, pricetfItem) => {
     // Initialse two objects to contain the items final buy and sell prices.
     var final_buyObj = {
         keys: 0,
@@ -602,24 +639,6 @@ const getAverages = (name, buyFiltered, sellFiltered, sku) => {
         keys: 0,
         metal: 0
     };
-
-    // Get the price of the item from the in-memory external pricelist.
-    var data;
-    try {
-        data = Methods.getItemPriceFromExternalPricelist(sku, external_pricelist);
-    } catch (e) {
-        throw new Error(`| UPDATING PRICES |: Couldn't price ${name}. Issue with Price.tf.`);
-    }
-
-    var pricetfItem = data.pricetfItem;
-
-    if (
-        (pricetfItem.buy.keys === 0 && pricetfItem.buy.metal === 0) ||
-        (pricetfItem.sell.keys === 0 && pricetfItem.sell.metal === 0)
-    ) {
-        throw new Error(`| UPDATING PRICES |: Couldn't price ${name}. Item is not priced on price.tf, therefore we can't
-        compare our average price to it's average price.`);
-    }
 
     try {
         if (buyFiltered.length < 3) {
