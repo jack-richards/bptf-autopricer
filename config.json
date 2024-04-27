@@ -16,6 +16,7 @@
         "sell": -8
     },
     "alwaysQuerySnapshotAPI": true,
+    "fallbackOntoPricesTf": false,
     "excludedSteamIDs": [
         "76561199384015307",
         "76561199495073910",
