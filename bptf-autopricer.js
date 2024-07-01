@@ -268,12 +268,17 @@ function handleEvent(e) {
                 if (!excludedSteamIds.some(id => steamid === id)) {
                     // Perform further filtering to ignore listing if it mentions spells in it's description.
                     // Prices tend to be significantly different for spelled items.
+                    // Splits description up into whole words, meaning if "Ex" is a blocked description term then
+                    // the word "Explosion" will not cause a false positive.
                     if (
-                        listingDetails &&
+                        listingDetails && 
                         !excludedListingDescriptions.some(detail =>
-                            listingDetails.normalize('NFKD').toLowerCase().trim().includes(detail)
+                            new RegExp(`\\b${detail}\\b`, 'i').test(
+                                listingDetails.normalize('NFKD').toLowerCase().trim()
+                            )
                         )
-                    ) {
+                    )
+                    {
                         try {
                             // Generate SKU from name. Found out that a perfect version of this method was already
                             // created by the developers who worked on tf2autobot. I believe they forked Nicklasons
@@ -385,9 +390,11 @@ const insertListings = async (unformattedListings, sku, name) => {
 
         for (const listing of unformattedListings) {
             if (
-                listing.details &&
+                listingDetails && 
                 excludedListingDescriptions.some(detail =>
-                    listing.details.normalize('NFKD').toLowerCase().trim().includes(detail)
+                    new RegExp(`\\b${detail}\\b`, 'i').test(
+                        listingDetails.normalize('NFKD').toLowerCase().trim()
+                    )
                 )
             ) {
                 // Skip this listing. Listing is for a spelled item.
