@@ -390,10 +390,10 @@ const insertListings = async (unformattedListings, sku, name) => {
 
         for (const listing of unformattedListings) {
             if (
-                listingDetails && 
+                listing.details && 
                 excludedListingDescriptions.some(detail =>
                     new RegExp(`\\b${detail}\\b`, 'i').test(
-                        listingDetails.normalize('NFKD').toLowerCase().trim()
+                        listing.details.normalize('NFKD').toLowerCase().trim()
                     )
                 )
             ) {
