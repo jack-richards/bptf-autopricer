@@ -265,5 +265,7 @@ pm2 start bptf-autopricer.js
 ## Adding Items to Price.
 - **Using the API Routes:** Send requests to the relevant route specified in the [API section](#api-routes--socket-io).
 - **Manual Additions:** Add items to price manually to [`item_list.json`](https://github.com/jack-richards/bptf-autopricer/blob/main/files/item_list.json). Make sure to use the valid format shown.
+- **Via a Button-Press:** Add or remove items to price directly on the backpack.tf stats page for an item using this [user-script](https://github.com/AlexLKW/tf2autobot-owner-script).
+  - It is **important** to note that by linking this script I am not indicating that it is safe for use, please analyse the repository for yourself and make your own judgment.
 
 Each item name given should be the same as the one used for its listings on [backpack.tf](https://backpack.tf/). For example, `Non-Craftable Tour of Duty Ticket` **NOT** `Uncraftable Tour of Duty Ticket`.
