@@ -201,6 +201,11 @@ const calculateAndEmitPrices = async () => {
             if (!item) {
                 continue;
             }
+            // If item is priced at 0, we skip it. Autobot cache of the prices.tf pricelist can sometimes have items set as such.
+            if (item.buy.keys === 0 && item.buy.metal === 0 ||
+                item.sell.keys === 0 && item.sell.metal === 0) {
+                    throw new Error("Autobot cache of prices.tf pricelist has marked item with price of 0.");
+            }
             // Save item to pricelist. Pricelist.json is mainly used by the pricing API.
             Methods.addToPricelist(item, PRICELIST_PATH);
             // Instead of emitting item here, we store it in a array, so we can emit all items at once.
