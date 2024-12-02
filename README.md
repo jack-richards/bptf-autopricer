@@ -269,3 +269,6 @@ pm2 start bptf-autopricer.js
   - It is **important** to note that by linking this script I am not indicating that it is safe for use, please analyse the repository for yourself and make your own judgment.
 
 Each item name given should be the same as the one used for its listings on [backpack.tf](https://backpack.tf/). For example, `Non-Craftable Tour of Duty Ticket` **NOT** `Uncraftable Tour of Duty Ticket`.
+
+## Seamless integration with tf2-trading-bot
+bptf-autopricer seamlessly integrates with my [tf2 trading bot project](https://github.com/jack-richards/tf2-trading-bot), providing an ultra-fast trading experience with highly competitive pricing.
