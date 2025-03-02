@@ -1,11 +1,9 @@
 var Methods = function() {};
-var fs = require('fs');
-
 const axios = require('axios');
-const AsyncLock = require('async-lock');
-const lock = new AsyncLock();
 
 const config = require('./config.json');
+
+const { pgp, db } = require('./pg-instance');
 
 Methods.prototype.halfScrapToRefined = function(halfscrap) {
     var refined = parseFloat((halfscrap / 18).toString().match(/^-?\d+(?:\.\d{0,2})?/)[0]);
@@ -183,54 +181,21 @@ Methods.prototype.createCurrencyObject = function(obj) {
     return newObj;
 };
 
-const comparePrices = (item1, item2) => {
-    return item1.keys === item2.keys && item1.metal === item2.metal;
-};
-
-Methods.prototype.addToPricelist = function(item, PRICELIST_PATH) {
+Methods.prototype.addToPricelist = async function(item) {
     try {
-    lock.acquire('pricelist', () => {
-        const data = fs.readFileSync(PRICELIST_PATH, 'utf8');
-
-        // Parse the existing JSON content into a JavaScript object
-        let existingData = JSON.parse(data);
-        let items = existingData.items;
-
-        // Ensure the existing data is an array (if it's not, create an array)
-        if (!Array.isArray(existingData.items)) {
-            items = [];
-        }
-
-        const existingIndex = items.findIndex(pricelist_item => pricelist_item.sku === item.sku);
-
-        if (existingIndex !== -1) {
-            let pl_item = items[existingIndex];
-            if (item.buy && item.sell && pl_item.buy && pl_item.sell) {
-                if (comparePrices(pl_item.buy, item.buy) && comparePrices(pl_item.sell, item.sell)) {
-                    // Prices are the same, no need to update.
-                    return;
-                } else {
-                    // Prices are different, update.
-                    items[existingIndex] = item;
-                }
-            } else if (item.buy && item.sell && (!pl_item.buy || !pl_item.sell)) {
-                // We have a buy and sell price, but the pricelist item doesn't.
-                items[existingIndex] = item;
-            } else {
-                // Data is missing, don't update.
-                return;
-            }
-        } else {
-            // If the item doesn't exist, add it to the end of the array
-            items.push(item);
-        }
-
-        // Stringify the updated data back to JSON
-        const updatedData = JSON.stringify(existingData, null, 2); // 2 is for indentation
-
-        // Write the updated JSON back to the file synchronously
-        fs.writeFileSync(PRICELIST_PATH, updatedData, 'utf8');
-    });
+        const { name, sku, buy, sell, time } = item;
+        const query = `
+            INSERT INTO pricelist (name, sku, buy, sell, time)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (name, sku)
+            DO UPDATE SET
+                buy = EXCLUDED.buy,
+                sell = EXCLUDED.sell,
+                time = EXCLUDED.time
+        `;
+        await db.tx(async t => {
+            return t.none(query, [name, sku, buy, sell, time]);
+        });
     } catch (error) {
         console.error('Error:', error);
     }
@@ -240,7 +205,7 @@ Methods.prototype.addToPricelist = function(item, PRICELIST_PATH) {
 
 Methods.prototype.getListingsFromSnapshots = async function(name) {
     try {
-        // Endpoint is limited to 1 request per 60 seconds.
+        // Endpoint is limited to 60 requests per 60 seconds.
         await this.waitXSeconds(1);
         const response = await axios.get(`https://backpack.tf/api/classifieds/listings/snapshot`, {
             params: {
@@ -280,7 +245,7 @@ Methods.prototype.getJWTFromPricesTF = async function(page, limit) {
             }
         } catch (error) {
             // Added in rare case we get rate limited requesting a JWT.
-            if (error?.status === 429 || error?.response?.data.statusCode === 429) {
+            if (error?.status === 429 || error?.response?.data.statusCode === 429 || error?.response?.data.statusCode === 401) {
                 // Retry in 60 seconds.
                 await this.waitXSeconds(60);
             }

@@ -11,7 +11,6 @@ const Schema = require('@tf2autobot/tf2-schema');
 const config = require('./config.json');
 
 const SCHEMA_PATH = './schema.json';
-const PRICELIST_PATH = './files/pricelist.json';
 const ITEM_LIST_PATH = './files/item_list.json';
 
 const { listen, socketIO } = require('./API/server.js');
@@ -37,21 +36,8 @@ const alwaysQuerySnapshotAPI = config.alwaysQuerySnapshotAPI;
 
 const fallbackOntoPricesTf = config.fallbackOntoPricesTf;
 
-// Create database instance for pg-promise.
-const pgp = require('pg-promise')({
-    schema: config.database.schema
-});
-
-// Create a database instance
-const cn = {
-    host: config.database.host,
-    port: config.database.port,
-    database: config.database.name,
-    user: config.database.user,
-    password: config.database.password
-};
-
-const db = pgp(cn);
+// Import pg connection instance.
+const { pgp, db } = require('./pg-instance.js');
 
 // ColumnSet object for insert queries.
 const cs = new pgp.helpers.ColumnSet(['name', 'sku', 'currencies', 'intent', 'updated', 'steamid'], {
@@ -62,19 +48,10 @@ if (fs.existsSync(SCHEMA_PATH)) {
     // A cached schema exists.
 
     // Read and parse the cached schema.
-    const cachedData = JSON.parse(fs.readFileSync(SCHEMA_PATH), 'utf8');
+    const cachedData = JSON.parse(fs.readFileSync(SCHEMA_PATH, 'utf8'));
 
     // Set the schema data.
     schemaManager.setSchema(cachedData);
-}
-
-// Pricelist doesn't exist.
-if (!fs.existsSync(PRICELIST_PATH)) {
-    try {
-        fs.writeFileSync(PRICELIST_PATH, '{"items": []}', 'utf8');
-    } catch (err) {
-        console.error(err);
-    }
 }
 
 // Item list doesn't exist.
@@ -98,12 +75,12 @@ var external_pricelist;
 const updateKeyObject = async () => {
     var key_item = await Methods.getKeyFromExternalAPI();
     // Save item to pricelist. Pricelist.json is mainly used by the pricing API.
-    Methods.addToPricelist(key_item, PRICELIST_PATH);
+    await Methods.addToPricelist(key_item);
     keyobj = {
         metal: key_item.sell.metal
     };
     // Emit new key price.
-    socketIO.emit('price', key_item);
+    socketIO.emit('keyPrice');
 }
 
 const rws = new ReconnectingWebSocket('wss://ws.backpack.tf/events/', undefined, {
@@ -130,7 +107,7 @@ const loadNames = () => {
 
 loadNames();
 
-// Watch the JSON file for changes
+// Watch the JSON file for changes.
 const watcher = chokidar.watch(ITEM_LIST_PATH);
 
 // When the JSON file changes, re-read and update the Set of item names.
@@ -181,7 +158,7 @@ const updateFromSnapshot = async (name, sku) => {
 }
 
 const calculateAndEmitPrices = async () => {
-    let item_objects = [];
+    // let item_objects = [];
     for (const name of allowedItemNames) {
         try {
             // We don't calculate the price of a key here.
@@ -206,24 +183,26 @@ const calculateAndEmitPrices = async () => {
                 item.sell.keys === 0 && item.sell.metal === 0) {
                     throw new Error("Autobot cache of prices.tf pricelist has marked item with price of 0.");
             }
-            // Save item to pricelist. Pricelist.json is mainly used by the pricing API.
-            Methods.addToPricelist(item, PRICELIST_PATH);
+            // Save item to pricelist database table.
+            await Methods.addToPricelist(item);
             // Instead of emitting item here, we store it in a array, so we can emit all items at once.
             // This allows us to control the speed at which we emit items to the client.
             // Up to your own discretion whether this is neeeded or not.
-            item_objects.push(item);
+            // item_objects.push(item);
         } catch (e) {
             console.log(e);
             console.log("Couldn't create a price for " + name);
         }
     }
+
+    socketIO.emit('pricesUpdated');
     // Emit all items within extremely quick succession of eachother.
     // With a 0.3 second gap between each.
-    for (const item of item_objects) {
-        // Emit item object.
-        await Methods.waitXSeconds(0.3);
-        socketIO.emit('price', item);
-    }
+    // for (const item of item_objects) {
+    //     // Emit item object.
+    //     await Methods.waitXSeconds(0.3);
+    //     socketIO.emit('price', item);
+    // }
 };
 
 function handleEvent(e) {

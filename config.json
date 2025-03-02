@@ -6,7 +6,7 @@
         "schema": "tf2",
         "host": "localhost",
         "port": 5432,
-        "name": "bptf-autopricer",
+        "name": "trading_bot IF using with tf2-trading-bot ELSE bptf-autopricer",
         "user": "postgres",
         "password": "database password"
     },
@@ -16,7 +16,7 @@
         "sell": -8
     },
     "alwaysQuerySnapshotAPI": true,
-    "fallbackOntoPricesTf": false,
+    "fallbackOntoPricesTf": true,
     "excludedSteamIDs": [
         "76561199384015307",
         "76561199495073910",
