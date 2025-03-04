@@ -9,9 +9,11 @@ const router = express.Router();
 const PRICELIST_PATH = './files/pricelist.json'
 const ITEM_LIST_PATH = './files/item_list.json';
 
+// Import pg connection instance.
+const { db } = require('../../../pg-instance.js');
+
 // Get item price by SKU.
 router.get('/:sku', async (req, res) => {
-  let item_found = false;
   let item_object = {};
 
   try {
@@ -25,49 +27,35 @@ router.get('/:sku', async (req, res) => {
     return res.sendStatus(400);
   }
 
-  fs.readFile(PRICELIST_PATH, 'utf8', (err, data) => {
-      if(err) {
-        // req.reject etc.
-        return res.status(400).json({ error: 'Failed to load pricelist.'});
-      }
+  // Get results from the pricelist
+  try {
+    item_object = await db.oneOrNone('SELECT * FROM pricelist WHERE sku = $1', [req.params.sku]);
 
-    let sku = req.params.sku;
-    data = JSON.parse(data);
-
-    // Iterate over each item in the items JSON array.
-    for (const item of data.items) {
-      // Find the requested item.
-      if (item.sku === sku) {
-        item_found = true;
-        item_object = item;
-        break;
-      }
+    // Item was not found in the pricelist.
+    if (!item_object) {
+      return res.sendStatus(404);
     }
 
     // Item found, send item object as response.
-    if(item_found) {
-      return res.status(200).json(item_object);
-    } else {
-      // Item was not found in the pricelist.
-      return res.sendStatus(404);
-    }
-  });
+    return res.status(200).json(item_object);
+  } catch (error) {
+    console.error('Error fetching item from pricelist:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
 // Get pricelist.
-router.get('/', (req, res) => {
-    // Read pricelist into memory and send.
-    fs.readFile(PRICELIST_PATH, 'utf8', (err, data) => {
-        if(err) {
-            console.error(err);
-            return res.status(400).json({ error: 'Failed to load pricelist.'});
-        }
-
-        data = JSON.parse(data);
-
-        // Send pricelist to requestor.
-        return res.status(200).json(data);
-    });
+router.get('/', async (req, res) => {
+  try {
+      // Fetch pricelist from the database
+      let data = await db.any('SELECT * FROM pricelist');
+      
+      // Send response
+      return res.status(200).json(data);
+  } catch (error) {
+      console.error('Error fetching pricelist:', error);
+      return res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
 // Request check endpoint. For now this will do
