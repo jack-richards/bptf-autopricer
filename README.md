@@ -34,6 +34,19 @@ An open-source solution that generates item prices for selected items by utilisi
 - **Socket.IO Server:**
   - Emits item prices to any listeners using a Socket.IO server.
   - Prices are stored and emitted in a format fully supported by the [TF2 Auto Bot](https://github.com/TF2Autobot/tf2autobot) custom-pricer interface.
+ 
+## Two Versions – Seamless Integration with tf2-trading-bot
+
+`bptf-autopricer` integrates directly with my custom trading bot project: [**tf2-trading-bot**](https://github.com/jack-richards/tf2-trading-bot).
+
+This bot offers **ultra-fast trades**, **reliable listing management**, and significantly more consistent behavior when creating, updating, and removing listings — making it a powerful alternative to options like TF2AutoBot.
+
+> ⚠️ **Using tf2-trading-bot?**  
+You're currently viewing the **main** branch. For full compatibility, you’ll need to switch to the [**tf2-trading-bot branch**](https://github.com/jack-richards/bptf-autopricer/tree/tf2-trading-bot).
+
+That version of the pricer includes all necessary adjustments specifically for tf2-trading-bot.
+
+If you're **not** using tf2-trading-bot (e.g. you're using TF2AutoBot or another setup), stay on the **main** branch — you’re already in the right place.
 
 ## Requirements
 - Install dependencies by running `npm install` in the project directory with package.json.
@@ -285,6 +298,3 @@ pm2 start bptf-autopricer.js
   - It is **important** to note that by linking this script I am not indicating that it is safe for use, please analyse the repository for yourself and make your own judgment.
 
 Each item name given should be the same as the one used for its listings on [backpack.tf](https://backpack.tf/). For example, `Non-Craftable Tour of Duty Ticket` **NOT** `Uncraftable Tour of Duty Ticket`.
-
-## Seamless integration with tf2-trading-bot
-bptf-autopricer seamlessly integrates with my [tf2 trading bot project](https://github.com/jack-richards/tf2-trading-bot), providing an ultra-fast trading experience with highly competitive pricing.
