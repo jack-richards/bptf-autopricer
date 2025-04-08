@@ -255,11 +255,25 @@ If you want to use [PM2](https://github.com/Unitech/pm2) to run the application 
 pm2 start bptf-autopricer.js
 ```
 
+## FAQ
+- Q: How do I connect this to TF2AutoBot?
+- A: You are looking at the *wrong version* of the project, find the correct one [here](https://github.com/jack-richards/bptf-autopricer/)
+- Q: I am getting a 429 error in the console what does this mean?
+- A: See: https://github.com/jack-richards/bptf-autopricer/issues/17
+- Q: I am being shown 'error: relation "listings" does not exist' when running the pricer.
+- A: See: https://github.com/jack-richards/bptf-autopricer/issues/14
+- Q: Why is the pricer giving a 'Not valid JSON error'?
+- A: Your JSON isn't valid - you likely have a `item_list.json` file that does not follow the expected format. Refer to [this example](https://github.com/jack-richards/bptf-autopricer/blob/main/files/item_list.json) of what a valid `item_list.json` file should look like.
+- Q: There are loads of 'Couldn't price item' errors, is everything broken?!
+- A: Nope! Everything is fine :D it's typically just the pricer protecting you by discarding prices that deviate too much from the prices.tf baseline (which is configurable). In time, you should get a set of baseline prices for nearly all of your items which will be updated as regularly as possible thereafter.
+- Q: I am getting x error please help me!
+- A: Please ensure that you have read over the readme thoroughly and followed all the instructions listed. If you are still stuck:
+  - [Raise an issue](https://github.com/jack-richards/bptf-autopricer/issues/new), though I cannot guarantee I will respond in a timely manner.
+  - Or join the [TF2AutoBot discord](https://discord.gg/4k5tmMkXjB), which is a great place to ask questions! Please try to search old messages in the server to see if what you planned to ask has already been answered.
+
 ## Adding Items to Price.
-- **Using the API Routes:** Send requests to the relevant route specified in the [API section](#api-routes--socket-io).
-- **Manual Additions:** Add items to price manually to [`item_list.json`](https://github.com/jack-richards/bptf-autopricer/blob/main/files/item_list.json). Make sure to use the valid format shown.
-- **Via a Button-Press:** Add or remove items to price directly on the backpack.tf stats page for an item using this [user-script](https://github.com/AlexLKW/tf2autobot-owner-script).
-  - It is **important** to note that by linking this script I am not indicating that it is safe for use, please analyse the repository for yourself and make your own judgment.
+- **Using the API Routes:** Send requests to the relevant route specified in the [API section](#api-routes--socket-io). Keep in mind that you will need these requests to originate from the same machine as where bptf-autopricer is being hosted on.
+- **Manual Additions:** Add items to price manually to [`item_list.json`](https://github.com/jack-richards/bptf-autopricer/blob/tf2-trading-bot/files/item_list.json). Make sure to use the valid format shown.
 
 Each item name given should be the same as the one used for its listings on [backpack.tf](https://backpack.tf/). For example, `Non-Craftable Tour of Duty Ticket` **NOT** `Uncraftable Tour of Duty Ticket`.
 
