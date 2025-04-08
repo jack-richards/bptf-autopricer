@@ -13,9 +13,9 @@
 
 </div>
 
-#### **This version of the auto pricer is specifically for use with my [tf2-trading-bot project](https://github.com/jack-richards/tf2-trading-bot), an alternative to bots like TF2AutoBot, that is built upon the [tf2automatic framework](https://github.com/tf2-automatic/tf2-automatic).**
+**Use this version of bptf-autopricer if you're using [tf2-trading-bot](https://github.com/jack-richards/tf2-trading-bot)** — a custom trading bot built on top of the [tf2automatic framework](https://github.com/tf2-automatic/tf2-automatic), and an alternative to bots like TF2AutoBot.
 
-#### **If instead you would like to use bptf-autopricer with TF2AutoBot, please use the main branch version [here](https://github.com/jack-richards/bptf-autopricer).**
+**If you're not using tf2-trading-bot** — whether you're using TF2AutoBot or just prefer the original bptf-autopricer — use the main branch instead: [here](https://github.com/jack-richards/bptf-autopricer).
 
 ### What is bptf-autopricer?
 An open-source solution that generates item prices for selected items by utilising listing data from [backpack.tf](https://backpack.tf/). Each price created is a result of the meticulous evaluation of both the underlying data and the actual prices, incorporating multiple checks and balances to counteract potential price manipulation.
