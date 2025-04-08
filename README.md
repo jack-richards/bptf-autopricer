@@ -42,21 +42,9 @@ An open-source solution that generates item prices for selected items by utilisi
 
 ## Requirements
 - Install dependencies by running `npm install` in the project directory with package.json.
-- A PostgreSQL database is required. You have **two** options in setting this up.
-  1. Keep the default options for the database in `config.json` and follow along with the tutorial provided in [INITIALIZE-DB.md](https://github.com/jack-richards/bptf-autopricer/blob/main/INITIALIZE-DB.md) to satisfy all the database requirements. 
-  2. Create a database and schema according to your preferences and specify them in `config.json`. A table named listings must be created using the following SQL statement:
-```sql
-CREATE TABLE your_schema_name.listings (
-    name character varying NOT NULL,
-    sku character varying NOT NULL,
-    currencies json NOT NULL,
-    intent character varying NOT NULL,
-    updated bigint NOT NULL,
-    steamid character varying NOT NULL,
-    CONSTRAINT listings_pkey PRIMARY KEY (name, sku, intent, steamid)
-);
-```
-Regardless of the option you choose. Make sure you have properly specified the database name, schema, user, and other relevant details that you are using in the `config.json` file.
+- A PostgreSQL database is required:
+  - Look up a tutorial online on how to install it for your particular operating system.
+  - After it is instaled, follow along with the tutorial provided in [INITIALIZE-DB.md](https://github.com/jack-richards/bptf-autopricer/blob/tf2-trading-bot/INITIALIZE-DB.md) to satisfy all the database requirements. 
 
 ## Configuration
 To configure the application you need to specify the values for all the fields in `config.json`.
