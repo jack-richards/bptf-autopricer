@@ -6,7 +6,7 @@ If you want to use the default database settings as provided in the config.json 
    - If it asks for a password, make sure you note it down as you will need to set the password in `config.json` once you are done here.
    - If no password was required, then you likely need to create one for this user, use the following command in the open psql session:
    - \password postgres and enter a new password when prompted.
-3. If you are setting up this auto pricer to be used alongside my [**tf2-trading-bot** project](https://github.com/jack-richards/tf2-trading-bot), run the following command:
+3. To set up the auto-pricer to be used alongside my [**tf2-trading-bot** project](https://github.com/jack-richards/tf2-trading-bot), run the following command:
       - `CREATE DATABASE "trading_bot";`
    - Then change the database ["name" field in the config](https://github.com/jack-richards/bptf-autopricer/blob/tf2-trading-bot/config.json#L9) to "trading_bot".
 6. Type \c "trading_bot" and hit enter
