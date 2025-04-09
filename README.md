@@ -174,11 +174,11 @@ Similarly, an event called 'keyPrice' is emitted when a new key price is determi
 **Note:** `tf2-trading-bot` uses this table as its **pricelist**. Any items listed here will be actively banked.
 
 ### To **stop banking** an item:
-1. Remove the item from `item_list.json` so that `bptf-autopricer` stops pricing it.
+1. Remove the item from `item_list.json` so that `bptf-autopricer` stops pricing it. Can be done via the API or by manually editing the file.
 2. Delete the corresponding item record from the pricelist database table.
 
 ### To **start banking** an item:
-1. Add the item to `item_list.json`, which will trigger `bptf-autopricer` to start pricing it.
+1. Add the item to `item_list.json`, which will trigger `bptf-autopricer` to start pricing it. Can be done via the API or by manually editing the file.
 2. Once priced, it will automatically be included in the pricelist database table and begin being banked.
   
 # API
