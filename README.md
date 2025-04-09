@@ -147,8 +147,12 @@ Consider your requirements for pricing accuracy, speed, and data freshness when 
 "alwaysQuerySnapshotAPI": true
 ```
 
-## API Routes & Socket IO
-The socket io server will emit events called 'price' with an item object as the value. The item objects are structured like the following:
+## Socket IO
+When bptf-autopricer has successfully updated the item prices, it will signal tf2-trading-bot to update any listing details via emitting the event 'pricesUpdated', this event has no attached data/object.\
+Similarly, an event called 'keyPrice' is emitted when a new key price is determined.
+
+## Pricelist Table
+- Each item in the pricelist table maintains the following JSON structure:
 ```JSON
 {
   "name": "Strange Australium Minigun",
@@ -165,13 +169,21 @@ The socket io server will emit events called 'price' with an item object as the 
   }
 }
 ```
-- Note that the same JSON structure is used when an item or an array of items is returned by the API.
-- This JSON format is fully compatible with what [TF2 Auto Bot](https://github.com/TF2Autobot/tf2autobot) requires for a custom pricer implementation.
+- The same JSON structure is also used when an item or an array of items is returned from the API.
   
-#
+**Note:** `tf2-trading-bot` uses this table as its **pricelist**. Any items listed here will be actively banked.
+
+### To **stop banking** an item:
+1. Remove the item from `item_list.json` so that `bptf-autopricer` stops pricing it.
+2. Delete the corresponding item record from the pricelist database table.
+
+### To **start banking** an item:
+1. Add the item to `item_list.json`, which will trigger `bptf-autopricer` to start pricing it.
+2. Once priced, it will automatically be included in the pricelist database table and begin being banked.
+  
+# API
 Now I'll highlight the different API routes you can make queries to, and what responses you can expect to receive.\
 Please note that both the Socket IO server and API run locally (localhost) on the port defined in `config.json`.
-#
 
 ```plain text
 GET /items/:sku
