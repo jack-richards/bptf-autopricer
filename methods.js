@@ -306,10 +306,10 @@ Methods.prototype.getKeyPriceFromPricesTF = async function() {
                 return {
                     metal: sellMetal
                 };
-            }
+            } 
 
             tries++;
-        }
+        } 
 
         throw new Error('Failed to get key price from Prices.TF. It is either down or we are being rate-limited.');
     } catch (error) {
@@ -361,7 +361,7 @@ Methods.prototype.getKeyFromExternalAPI = async function() {
                 key_object.time = Math.floor(Date.now() / 1000);
 
                 return key_object;
-            }
+            } 
 
             // Wait 10 seconds between retries. I want to ensure that this succeeds as the key price is very important.
             await this.waitXSeconds(10);
