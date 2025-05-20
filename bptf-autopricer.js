@@ -6,6 +6,10 @@ const chokidar = require('chokidar');
 const methods = require('./methods');
 const Methods = new methods();
 
+const path = require('path');
+
+const PriceWatcher = require('./modules/PriceWatcher'); //outdated price logging
+
 const Schema = require('@tf2autobot/tf2-schema');
 
 const config = require('./config.json');
@@ -95,16 +99,58 @@ schemaManager.on('schema', function(schema) {
 var keyobj;
 var external_pricelist;
 
+//const updateKeyObject = async () => {
+//    var key_item = await Methods.getKeyFromExternalAPI();
+//    // Save item to pricelist. Pricelist.json is mainly used by the pricing API.
+//    Methods.addToPricelist(key_item, PRICELIST_PATH);
+//    keyobj = {
+//        metal: key_item.sell.metal
+//    };
+//    // Emit new key price.
+//    socketIO.emit('price', key_item);
+//}
+
 const updateKeyObject = async () => {
-    var key_item = await Methods.getKeyFromExternalAPI();
-    // Save item to pricelist. Pricelist.json is mainly used by the pricing API.
-    Methods.addToPricelist(key_item, PRICELIST_PATH);
-    keyobj = {
-        metal: key_item.sell.metal
+  let key_item;
+
+  try {
+    // Primary: Prices.TF API
+    key_item = await Methods.getKeyFromExternalAPI();
+  } catch (e) {
+    console.error('Prices.TF API failed, falling back to autobot.tf pricelist:', e);
+
+    // 2a) fetch the external pricelist
+    const externalPricelist = await Methods.getExternalPricelist();
+
+    // 2b) grab the item with the same SKU
+    const { pricetfItem } = Methods.getItemPriceFromExternalPricelist('5021;6', externalPricelist);
+
+    // 2c) reshape to match the key_item interface
+    key_item = {
+      name: pricetfItem.name || 'Mann Co. Supply Crate Key',  // or whatever defaults you prefer
+      sku: '5021;6',
+      source: 'bptf',
+      buy: {
+        keys: pricetfItem.buy.keys,
+        metal: pricetfItem.buy.metal
+      },
+      sell: {
+        keys: pricetfItem.sell.keys,
+        metal: pricetfItem.sell.metal
+      },
+      time: Math.floor(Date.now() / 1000)
     };
-    // Emit new key price.
-    socketIO.emit('price', key_item);
-}
+  }
+
+  // 3) Now key_item is guaranteed to be defined
+  Methods.addToPricelist(key_item, PRICELIST_PATH);
+
+  keyobj = {
+    metal: key_item.sell.metal
+  };
+
+  socketIO.emit('price', key_item);
+};
 
 const rws = new ReconnectingWebSocket('wss://ws.backpack.tf/events/', undefined, {
     WebSocket: ws,
@@ -185,9 +231,9 @@ const calculateAndEmitPrices = async () => {
     for (const name of allowedItemNames) {
         try {
             // We don't calculate the price of a key here.
-            if (name === 'Mann Co. Supply Crate Key') {
-                continue;
-            }
+            //if (name === 'Mann Co. Supply Crate Key') {
+                //continue;
+            //}
             // Get sku of item via the item name.
             let sku = schemaManager.schema.getSkuFromName(name);
             // Delete old listings from database.
@@ -239,9 +285,9 @@ function handleEvent(e) {
                 let listingItemObject = e.payload.item; // The item object where paint and stuff is stored.
 
                 // Ignore keys. We price those using prices.tf.
-                if (response_item.name === 'Mann Co. Supply Crate Key') {
-                    return;
-                }
+                //if (response_item.name === 'Mann Co. Supply Crate Key') {
+                    //return;
+                //}
 
                 // If userAgent field is not present, return.
                 // This indicates that the listing was not created by a bot.
@@ -320,10 +366,19 @@ schemaManager.init(async function(err) {
     if (err) {
         throw err;
     }
+	
+	// Start watching pricelist.json for “old” entries
+    // pricelist.json lives in ./files/pricelist.json relative to this file:
+    const pricelistPath = path.resolve(__dirname, './files/pricelist.json');
+    // You can pass a custom ageThresholdSec (default is 2*3600) and intervalSec (default is 300)
+    PriceWatcher.watchPrices(pricelistPath /*, ageThresholdSec, intervalSec */);
+
+	// Get external pricelist.
+    external_pricelist = await Methods.getExternalPricelist();
     // Update key object.
     await updateKeyObject();
     // Get external pricelist.
-    external_pricelist = await Methods.getExternalPricelist();
+    //external_pricelist = await Methods.getExternalPricelist();
     // Calculate and emit prices on startup.
     await calculateAndEmitPrices();
 
@@ -349,13 +404,13 @@ schemaManager.init(async function(err) {
     }, 30 * 60 * 1000);
 
     // Update key object every 3 minutes.
-    setInterval(async () => {
-        try {
-            await updateKeyObject();
-        } catch (e) {
-            console.error(e);
-        }
-    }, 3 * 60 * 1000);
+    //setInterval(async () => {
+        //try {
+            //await updateKeyObject();
+        //} catch (e) {
+            //console.error(e);
+        //}
+    //}, 3 * 60 * 1000);
 
     // Calculate prices using listing data every 15 minutes.
     setInterval(async () => {
