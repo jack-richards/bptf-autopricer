@@ -1,4 +1,4 @@
-# bptf-autopricer
+# bliss-autopricer
 <div align="center"><img src="https://github.com/jack-richards/bptf-autopricer/assets/58331725/203fe808-30ff-4d7d-868c-a3ef6d31497d" alt="logo" style="width: 280px; height: 320px; display: block; margin-left: auto; margin-right: auto;"></div>
 
 A custom pricer that generates item prices by analysing live and snapshot data from [backpack.tf](https://backpack.tf), applies sanity checks, and integrates seamlessly with TF2 Autobot. Modified and forked from Jacks Auto Pricer!
@@ -56,7 +56,7 @@ Setup & Installation
 
 Create your database/schema and the `listings` and `key_prices` table or alternativly follow the instructions within the [INITIALIZE-DB.md](https://github.com/jack-richards/bptf-autopricer/blob/main/INITIALIZE-DB.md) for a quick start.
 
-```
+```SQL
 CREATE SCHEMA schemaname AUTHORIZATION postgres;
 CREATE TABLE schemaname.listings
 (
@@ -85,7 +85,7 @@ Configuration
 
 Holds core pricer settings:
 
-```
+```JSON
 {
   "bptfAPIKey": "<your backpack.tf API key>",
   "bptfToken": "<your backpack.tf token>",
@@ -128,7 +128,7 @@ Holds core pricer settings:
 
 Controls the Price Watcher web UI and integration with TF2AutoBot's selling pricelist:
 
-```
+```JSON
 {
   "pm2ProcessName": "tf2autobot",     // Name for PM2 restart on changes
   "tf2AutobotDir": "../../tf2autobot-5.13.0", // Path to TF2 Autobot root
@@ -143,7 +143,7 @@ API Routes & Socket IO
 
 The socket io server will emit events called 'price' with an item object as the value. The item objects are structured like the following:
 
-```
+```JSON
 {
   "name": "Strange Australium Minigun",
   "sku": "202;11;australium",
