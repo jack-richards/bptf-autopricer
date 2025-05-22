@@ -2,23 +2,17 @@ const ReconnectingWebSocket = require('reconnecting-websocket');
 const ws = require('ws');
 const fs = require('fs');
 const chokidar = require('chokidar');
-
 const methods = require('./methods');
 const Methods = new methods();
-
 const path = require('path');
-
 const PriceWatcher = require('./modules/PriceWatcher'); //outdated price logging
-
 const Schema = require('@tf2autobot/tf2-schema');
-
 const config = require('./config.json');
-
 const SCHEMA_PATH = './schema.json';
 const PRICELIST_PATH = './files/pricelist.json';
 const ITEM_LIST_PATH = './files/item_list.json';
-
 const { listen, socketIO } = require('./API/server.js');
+const { startPriceWatcher } = require('./modules/PriceWatcherWebService');
 
 // Steam API key is required for the schema manager to work.
 const schemaManager = new Schema({
@@ -416,6 +410,8 @@ schemaManager.init(async function(err) {
     setInterval(async () => {
         await calculateAndEmitPrices();
     }, 15 * 60 * 1000); // Every 15 minutes.
+	
+	startPriceWatcher(); //start webpage for price watching 
 });
 
 const getListings = async (name, intent) => {
@@ -565,7 +561,7 @@ const determinePrice = async (name, sku) => {
     try {
         data = Methods.getItemPriceFromExternalPricelist(sku, external_pricelist);
     } catch (e) {
-        throw new Error(`| UPDATING PRICES |: Couldn't price ${name}. Issue with Price.tf.`);
+        throw new Error(`| UPDATING PRICES |: Couldn't price ${name}. Issue with Prices.tf.`);
     }
 
     var pricetfItem = data.pricetfItem;
@@ -574,7 +570,7 @@ const determinePrice = async (name, sku) => {
         (pricetfItem.buy.keys === 0 && pricetfItem.buy.metal === 0) ||
         (pricetfItem.sell.keys === 0 && pricetfItem.sell.metal === 0)
     ) {
-        throw new Error(`| UPDATING PRICES |: Couldn't price ${name}. Item is not priced on price.tf, therefore we can't
+        throw new Error(`| UPDATING PRICES |: Couldn't price ${name}. Item is not priced on prices.tf, therefore we can't
         compare our average price to it's average price.`);
     }
 
@@ -598,7 +594,7 @@ const determinePrice = async (name, sku) => {
                 keys: pricetfItem.sell.keys,
                 metal: pricetfItem.sell.metal
             };
-            // Return price.tf price.
+            // Return prices.tf price.
             return [final_buyObj, final_sellObj];
         }
         // If we don't fallback onto prices.tf, re-throw the error.

@@ -1,0 +1,7 @@
+{
+  "pm2ProcessName": "tf2autobot",
+  "tf2AutobotDir": "../../tf2autobot-5.13.0",
+  "botTradingDir": "files/bot",
+  "port": 3000,
+  "ageThresholdSec": 7200
+}
