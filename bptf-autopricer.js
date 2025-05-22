@@ -93,17 +93,6 @@ schemaManager.on('schema', function(schema) {
 var keyobj;
 var external_pricelist;
 
-//const updateKeyObject = async () => {
-//    var key_item = await Methods.getKeyFromExternalAPI();
-//    // Save item to pricelist. Pricelist.json is mainly used by the pricing API.
-//    Methods.addToPricelist(key_item, PRICELIST_PATH);
-//    keyobj = {
-//        metal: key_item.sell.metal
-//    };
-//    // Emit new key price.
-//    socketIO.emit('price', key_item);
-//}
-
 const updateKeyObject = async () => {
   let key_item;
 
@@ -224,10 +213,6 @@ const calculateAndEmitPrices = async () => {
     let item_objects = [];
     for (const name of allowedItemNames) {
         try {
-            // We don't calculate the price of a key here.
-            //if (name === 'Mann Co. Supply Crate Key') {
-                //continue;
-            //}
             // Get sku of item via the item name.
             let sku = schemaManager.schema.getSkuFromName(name);
             // Delete old listings from database.
@@ -277,11 +262,6 @@ function handleEvent(e) {
                 let currencies = e.payload.currencies;
                 let listingDetails = e.payload.details;
                 let listingItemObject = e.payload.item; // The item object where paint and stuff is stored.
-
-                // Ignore keys. We price those using prices.tf.
-                //if (response_item.name === 'Mann Co. Supply Crate Key') {
-                    //return;
-                //}
 
                 // If userAgent field is not present, return.
                 // This indicates that the listing was not created by a bot.
@@ -396,15 +376,6 @@ schemaManager.init(async function(err) {
             console.error(e);
         }
     }, 30 * 60 * 1000);
-
-    // Update key object every 3 minutes.
-    //setInterval(async () => {
-        //try {
-            //await updateKeyObject();
-        //} catch (e) {
-            //console.error(e);
-        //}
-    //}, 3 * 60 * 1000);
 
     // Calculate prices using listing data every 15 minutes.
     setInterval(async () => {
