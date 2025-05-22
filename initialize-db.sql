@@ -9,3 +9,11 @@ CREATE TABLE tf2.listings
     steamid character varying NOT NULL,
     PRIMARY KEY (name, sku, intent, steamid)
 );
+CREATE TABLE tf2.key_prices (
+    id SERIAL PRIMARY KEY,
+    sku TEXT NOT NULL,
+    buy_price_metal DECIMAL NOT NULL,
+    sell_price_metal DECIMAL NOT NULL,
+    timestamp INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

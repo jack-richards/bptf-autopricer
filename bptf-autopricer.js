@@ -209,6 +209,143 @@ const updateFromSnapshot = async (name, sku) => {
     }
 }
 
+const cleanupOldKeyPrices = async () => {
+    try {
+        await db.none(
+            `DELETE FROM key_prices WHERE created_at < NOW() - INTERVAL '3 days'`
+        );
+        console.log("Cleaned up key prices older than 3 days.");
+    } catch (err) {
+        console.error("Error cleaning up old key prices:", err);
+    }
+};
+
+const priceHistory = {
+    buy: [],  // Stores the last few buy price changes
+    sell: []  // Stores the last few sell price changes
+};
+
+const MAX_HISTORY = 3;  // Track the last 3 changes for validation
+const CHANGE_THRESHOLD = 0.33;  // Threshold for price movement (up or down)
+const CONFIRMATION_THRESHOLD = 0.44;  // Threshold for confirming a change after multiple occurrences
+
+const adjustPrice = async (name, sku, newBuyPrice, newSellPrice) => {
+    try {
+        // Adjust the price for both buy and sell based on the logic
+        const timestamp = Math.floor(Date.now() / 1000);
+        await insertKeyPrice(newBuyPrice, newSellPrice, timestamp);
+
+        // Create the item object to be added to the pricelist
+        const updatedItem = {
+            name: name,
+            sku: sku,
+            buy: {
+                keys: newBuyPrice.keys,
+                metal: newBuyPrice.metal
+            },
+            sell: {
+                keys: newSellPrice.keys,
+                metal: newSellPrice.metal
+            },
+            time: timestamp
+        };
+
+        // Add the updated item to the pricelist
+        Methods.addToPricelist(updatedItem, PRICELIST_PATH); // Add updated item to pricelist
+
+        // Emit the updated price
+        socketIO.emit('price', updatedItem); // Emit the new price to the front-end
+
+        console.log(`Price for ${name} updated. Buy: ${newBuyPrice.metal}, Sell: ${newSellPrice.metal}`);
+    } catch (err) {
+        console.error("Error adjusting price:", err);
+    }
+};
+
+const sendPriceAlert = (message) => {
+    console.log(`ALERT: ${message}`);
+    // Here you can integrate with a notification system (email, Slack, etc.)
+};
+
+const checkKeyPriceStability = async () => {
+    try {
+        // Get the most recent prices for the last 3 days
+        const prices = await db.any(
+            `SELECT buy_price_metal, sell_price_metal, timestamp
+            FROM key_prices
+            WHERE sku = '5021;6' AND created_at > NOW() - INTERVAL '3 days'
+            ORDER BY created_at DESC`
+        );
+
+        if (prices.length < 2) {
+            console.log("Not enough price data to check stability.");
+            return;
+        }
+
+        const latestPrice = prices[0];
+        const previousPrice = prices[1];
+
+        // Track the current buy and sell price movements
+        let priceChanged = false;
+
+        // For Sell Price:
+        const sellPriceChange = latestPrice.sell_price_metal - previousPrice.sell_price_metal;
+        if (Math.abs(sellPriceChange) > CHANGE_THRESHOLD) {
+            // If the change is larger than the threshold, store the change and wait for confirmation
+            priceHistory.sell.push(sellPriceChange);
+            // Send alert about potential price fluctuation
+            sendPriceAlert(`Sell price for keys has fluctuated by ${sellPriceChange}. Waiting for confirmation.`);
+        }
+
+        // For Buy Price:
+        const buyPriceChange = latestPrice.buy_price_metal - previousPrice.buy_price_metal;
+        if (Math.abs(buyPriceChange) > CHANGE_THRESHOLD) {
+            // If the change is larger than the threshold, store the change and wait for confirmation
+            priceHistory.buy.push(buyPriceChange);
+            // Send alert about potential price fluctuation
+            sendPriceAlert(`Buy price for keys has fluctuated by ${buyPriceChange}. Waiting for confirmation.`);
+        }
+
+        // Only adjust if the price has stabilized over multiple checks
+        if (priceHistory.sell.length >= MAX_HISTORY && priceHistory.buy.length >= MAX_HISTORY) {
+            // Check if the sell price has consistently moved up or down by more than CONFIRMATION_THRESHOLD
+            const confirmedSellChange = priceHistory.sell.filter(change => Math.abs(change) > CONFIRMATION_THRESHOLD);
+            const confirmedBuyChange = priceHistory.buy.filter(change => Math.abs(change) > CONFIRMATION_THRESHOLD);
+
+            // If confirmed sell change is valid, update the sell price
+            if (confirmedSellChange.length === MAX_HISTORY) {
+                const newSellPrice = latestPrice.sell_price_metal + (sellPriceChange > 0 ? 0.11 : -0.11);  // Ensure a margin
+                await adjustPrice("Key", "5021;6", latestPrice.buy_price_metal, newSellPrice);
+                priceHistory.sell = []; // Reset history after adjustment
+                sendPriceAlert(`Sell price for keys confirmed. Adjusting price to ${newSellPrice}.`);
+            }
+
+            // If confirmed buy change is valid, update the buy price
+            if (confirmedBuyChange.length === MAX_HISTORY) {
+                const newBuyPrice = latestPrice.buy_price_metal - (buyPriceChange > 0 ? 0.11 : -0.11);  // Ensure a margin
+                await adjustPrice("Key", "5021;6", newBuyPrice, latestPrice.sell_price_metal);
+                priceHistory.buy = []; // Reset history after adjustment
+                sendPriceAlert(`Buy price for keys confirmed. Adjusting price to ${newBuyPrice}.`);
+            }
+        }
+
+    } catch (err) {
+        console.error("Error checking key price stability:", err);
+    }
+};
+
+const insertKeyPrice = async (buyPrice, sellPrice, timestamp) => {
+    try {
+        await db.none(
+            `INSERT INTO key_prices (sku, buy_price_metal, sell_price_metal, timestamp) 
+            VALUES ($1, $2, $3, $4)`,
+            ['5021;6', buyPrice, sellPrice, timestamp]
+        );
+    } catch (err) {
+        console.error("Error inserting key price:", err);
+    }
+};
+
 const calculateAndEmitPrices = async () => {
     let item_objects = [];
     for (const name of allowedItemNames) {
@@ -231,6 +368,15 @@ const calculateAndEmitPrices = async () => {
                 item.sell.keys === 0 && item.sell.metal === 0) {
                     throw new Error("Autobot cache of prices.tf pricelist has marked item with price of 0.");
             }
+
+            // If it's a key (sku 5021;6), insert the price into the key_prices table
+            if (sku === '5021;6') {
+                const buyPrice = item.buy.metal;
+                const sellPrice = item.sell.metal;
+                const timestamp = Math.floor(Date.now() / 1000);
+                await insertKeyPrice(buyPrice, sellPrice, timestamp);
+            }
+
             // Save item to pricelist. Pricelist.json is mainly used by the pricing API.
             Methods.addToPricelist(item, PRICELIST_PATH);
             // Instead of emitting item here, we store it in a array, so we can emit all items at once.
@@ -381,6 +527,14 @@ schemaManager.init(async function(err) {
     setInterval(async () => {
         await calculateAndEmitPrices();
     }, 15 * 60 * 1000); // Every 15 minutes.
+
+    setInterval(async () => {
+        await cleanupOldKeyPrices();
+    }, 60 * 60 * 1000); // Cleanup old key prices every 30 minutes (more than 3 days old)
+    
+    setInterval(async () => {
+        await checkKeyPriceStability();
+    }, 30 * 60 * 1000); // Check key price stability every 30 minutes
 	
 	startPriceWatcher(); //start webpage for price watching 
 });
