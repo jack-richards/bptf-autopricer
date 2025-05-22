@@ -153,7 +153,7 @@ const loadNames = () => {
             console.log('Updated allowed item names.');
         }
     } catch (error) {
-        console.error('Error reading and updating allowed item names');
+        console.error('Error reading and updating allowed item names', error);
     }
 };
 
@@ -184,7 +184,7 @@ const countListingsForItem = async (name) => {
         const { sell_count, buy_count } = result;
         return sell_count >= 1 && buy_count >= 10;
     } catch (error) {
-        console.error("Error counting listings");
+        console.error("Error counting listings", error);
         throw error;
     }
 };
@@ -366,7 +366,7 @@ const calculateAndEmitPrices = async () => {
             // If item is priced at 0, we skip it. Autobot cache of the prices.tf pricelist can sometimes have items set as such.
             if (item.buy.keys === 0 && item.buy.metal === 0 ||
                 item.sell.keys === 0 && item.sell.metal === 0) {
-                    throw new Error("Autobot cache of prices.tf pricelist has marked item with price of 0.");
+                    throw new Error("Autobot cache of prices.tf pricelist has marked item with price of 0.", e);
             }
 
             // If it's a key (sku 5021;6), insert the price into the key_prices table
@@ -375,7 +375,7 @@ const calculateAndEmitPrices = async () => {
                 const sellPrice = item.sell.metal;
                 const timestamp = Math.floor(Date.now() / 1000);
                 await insertKeyPrice(buyPrice, sellPrice, timestamp);
-                return;
+                continue;
             }
 
             // Save item to pricelist. Pricelist.json is mainly used by the pricing API.
