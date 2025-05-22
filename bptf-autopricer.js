@@ -308,8 +308,6 @@ const checkKeyPriceStability = async () => {
         );
       }
 
-     
-  
       // 4) early exit on a big buy swing
       if (Math.abs(buyDelta) > CHANGE_THRESHOLD) {
         rawBuy += (buyDelta > 0 ? -0.11 : +0.11);
@@ -324,6 +322,22 @@ const checkKeyPriceStability = async () => {
       // 5) fallback: no big swings, write the “latest” 3-hour averages
       const roundedSell = Methods.getRight(rawSell);
       const roundedBuy  = Methods.getRight(rawBuy);
+
+      const MIN_STEP = 0.11;
+
+      // 6) ensure buy is at least one step below sell
+      if (roundedSell - roundedBuy < MIN_STEP) {
+        // carve out exactly one step spread
+        rawBuy     = rawSell - MIN_STEP;
+        roundedBuy = Methods.getRight(rawBuy);
+
+        sendPriceAlert(
+            `Spread too tight (${(roundedSell - Methods.getRight(rawBuy + MIN_STEP)).toFixed(2)}); ` +
+            `forcing buy to ${roundedBuy} so buy + ${MIN_STEP.toFixed(2)} ≤ sell (${roundedSell}).`
+        );
+      }
+
+
       await adjustPrice("Mann Co. Supply Crate Key", "5021;6", roundedBuy, roundedSell);
       console.log(
         `Stable over last 6h (windows avg buy=${roundedBuy}, sell=${roundedSell}). Change delta for buy=${buyDelta} and change delta for sell=${sellDelta}`
