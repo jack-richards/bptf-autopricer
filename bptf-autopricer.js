@@ -315,7 +315,7 @@ const checkKeyPriceStability = async () => {
         rawBuy += (buyDelta > 0 ? -0.11 : +0.11);
         const roundedSell = Methods.getRight(rawSell);
         const roundedBuy  = Methods.getRight(rawBuy);
-        await adjustPrice("Mann Co. Supply Crate Key", "5021;6", roundedSell, roundedBuy);
+        await adjustPrice("Mann Co. Supply Crate Key", "5021;6", roundedBuy, roundedSell);
         return sendPriceAlert(
           `3h buy  avg moved by ${buyDelta.toFixed(2)} → adjusting to ${roundedBuy}`
         );
