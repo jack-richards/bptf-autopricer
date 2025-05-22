@@ -100,7 +100,7 @@ const updateKeyObject = async () => {
     // Primary: Prices.TF API
     key_item = await Methods.getKeyFromExternalAPI();
   } catch (e) {
-    console.error('Prices.TF API failed, falling back to autobot.tf pricelist:', e);
+    console.error('Prices.TF API failed, falling back to autobot.tf pricelist');
 
     // 2a) fetch the external pricelist
     const externalPricelist = await Methods.getExternalPricelist();
@@ -153,7 +153,7 @@ const loadNames = () => {
             console.log('Updated allowed item names.');
         }
     } catch (error) {
-        console.error('Error reading and updating allowed item names:', error);
+        console.error('Error reading and updating allowed item names');
     }
 };
 
@@ -184,7 +184,7 @@ const countListingsForItem = async (name) => {
         const { sell_count, buy_count } = result;
         return sell_count >= 1 && buy_count >= 10;
     } catch (error) {
-        console.error("Error counting listings:", error);
+        console.error("Error counting listings");
         throw error;
     }
 };
@@ -216,7 +216,7 @@ const cleanupOldKeyPrices = async () => {
         );
         console.log("Cleaned up key prices older than 3 days.");
     } catch (err) {
-        console.error("Error cleaning up old key prices:", err);
+        console.error("Error cleaning up old key prices");
     }
 };
 
@@ -258,7 +258,7 @@ const adjustPrice = async (name, sku, newBuyPrice, newSellPrice) => {
 
         console.log(`Price for ${name} updated. Buy: ${newBuyPrice.metal}, Sell: ${newSellPrice.metal}`);
     } catch (err) {
-        console.error("Error adjusting price:", err);
+        console.error("Error adjusting price");
     }
 };
 
@@ -330,7 +330,7 @@ const checkKeyPriceStability = async () => {
         }
 
     } catch (err) {
-        console.error("Error checking key price stability:", err);
+        console.error("Error checking key price stability");
     }
 };
 
@@ -342,7 +342,7 @@ const insertKeyPrice = async (buyPrice, sellPrice, timestamp) => {
             ['5021;6', buyPrice, sellPrice, timestamp]
         );
     } catch (err) {
-        console.error("Error inserting key price:", err);
+        console.error("Error inserting key price");
     }
 };
 
@@ -375,6 +375,7 @@ const calculateAndEmitPrices = async () => {
                 const sellPrice = item.sell.metal;
                 const timestamp = Math.floor(Date.now() / 1000);
                 await insertKeyPrice(buyPrice, sellPrice, timestamp);
+                return;
             }
 
             // Save item to pricelist. Pricelist.json is mainly used by the pricing API.
@@ -384,7 +385,6 @@ const calculateAndEmitPrices = async () => {
             // Up to your own discretion whether this is neeeded or not.
             item_objects.push(item);
         } catch (e) {
-            console.log(e);
             console.log("Couldn't create a price for " + name);
         }
     }
@@ -530,7 +530,7 @@ schemaManager.init(async function(err) {
 
     setInterval(async () => {
         await cleanupOldKeyPrices();
-    }, 60 * 60 * 1000); // Cleanup old key prices every 30 minutes (more than 3 days old)
+    }, 30 * 60 * 1000); // Cleanup old key prices every 30 minutes (more than 3 days old)
     
     setInterval(async () => {
         await checkKeyPriceStability();

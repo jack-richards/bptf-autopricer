@@ -41,7 +41,7 @@ function checkOldPrices(pricelistPath, ageThresholdSec = 2 * 3600) {
  * @param {string} pricelistPath
  * @param {number} intervalSec - Periodic check interval in seconds (optional)
  */
-function watchPrices(pricelistPath, intervalSec = 300) {
+function watchPrices(pricelistPath, intervalSec = 7200) {
   const fullPath = path.resolve(pricelistPath);
 
   // Initial check
