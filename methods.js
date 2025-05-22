@@ -21,8 +21,8 @@ Methods.prototype.refinedToHalfScrap = function(refined) {
 Methods.prototype.getRight = function(v) {
     var i = Math.floor(v),
         f = Math.round((v - i) / 0.11);
-    return parseFloat((i + (f === 9 || f * 0.11)).toFixed(2));
-};
+    return parseFloat((i + (f === 9 ? 1 : f * 0.11)).toFixed(2));
+  };
 
 // This method first takes the amount of keys the item costs and multiplies it by
 // the current key metal sell price. This gives us the amount of metal the key cost
