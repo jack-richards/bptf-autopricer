@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jack-richards/bptf-autopricer.git"
+    "url": "git+https://github.com/OliverPerring/bliss-autopricer.git"
   },
   "keywords": [
     "tf2",
