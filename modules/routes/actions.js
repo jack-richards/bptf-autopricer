@@ -17,6 +17,9 @@ module.exports = function(app, config) {
     const sell = loadJson(sellingPricelistPath);
     const main = loadJson(pricelistPath);
     const sku = req.body.sku;
+    const min = parseInt(req.body.min) || 1;
+    const max = parseInt(req.body.max) || 1;
+
     if (!sell[sku]) {
       const item = main.items.find(i => i.sku === sku);
       if (item) {
@@ -25,8 +28,8 @@ module.exports = function(app, config) {
           name: item.name,
           enabled: true,
           autoprice: true,
-          min: 0,
-          max: 1,
+          min: min,
+          max: max,
           intent: 2,
           buy: item.buy,
           sell: item.sell,
@@ -46,6 +49,7 @@ module.exports = function(app, config) {
     res.redirect('back');
   });
 
+
   app.post('/bot/remove', (req, res) => {
     const sell = loadJson(sellingPricelistPath);
     const sku = req.body.sku;
@@ -61,14 +65,39 @@ module.exports = function(app, config) {
   });
 
   app.post('/add-item', (req, res) => {
-    const name = req.body.name;
-    if (name) {
-      const jl = loadJson(itemListPath);
-      if (!jl.items.some(i => i.name === name)) {
-        jl.items.push({ name });
-        saveJson(itemListPath, jl);
-      }
+    const { name, min, max } = req.body;
+    if (!name || isNaN(min) || isNaN(max)) return res.redirect('back');
+
+    const itemList = loadJson(itemListPath);
+    if (!itemList.items.some(i => i.name === name)) {
+      itemList.items.push({ name });
+      saveJson(itemListPath, itemList);
     }
+
+    // Optionally log or store min/max for use elsewhere
+    console.log(`Added item: ${name} with min=${min}, max=${max}`);
+
     res.redirect('back');
+  });
+
+  app.post('/bot/edit', (req, res) => {
+    const { sku, min, max } = req.body;
+    if (!sku || isNaN(min) || isNaN(max)) return res.status(400).send('Invalid edit');
+
+    const pricelist = loadJson(sellingPricelistPath);
+    if (!pricelist[sku]) return res.status(404).send('Item not found');
+
+    pricelist[sku].min = parseInt(min);
+    pricelist[sku].max = parseInt(max);
+
+    saveJson(sellingPricelistPath, pricelist);
+
+    // Optional: trigger PM2 restart
+    exec('pm2 restart tf2autobot', (err, stdout, stderr) => {
+      if (err) console.error('PM2 restart error:', stderr);
+      else console.log('Bot restarted after edit:', stdout);
+    });
+
+    res.send('Updated');
   });
 };

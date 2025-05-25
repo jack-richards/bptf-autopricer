@@ -13,7 +13,7 @@ module.exports = function (app, config) {
 	const sellingPricelistPath = path.resolve(__dirname, config.tf2AutobotDir, config.botTradingDir, 'pricelist.json');
 	const itemListPath = path.resolve(__dirname, '../../files/item_list.json');
 
-	function buildTable(items, showAge) {
+	function buildTable(items, showAge, sell) {
 	  items.sort((a, b) => a.name.localeCompare(b.name));
 	  let tbl = '<table><thead><tr>' +
 		'<th>Name</th><th>SKU</th><th>Last Updated</th>' +
@@ -28,9 +28,19 @@ module.exports = function (app, config) {
 		const sellUnit = item.sell.keys === 1 ? 'Key' : 'Keys';
 		const inBot = item.inSelling;
 		const sku = item.sku;
-		const actionBtn = inBot
-		  ? `<button onclick="queueAction('remove','${sku}')">❌</button>`
-		  : `<button onclick="queueAction('add','${sku}')">✅</button>`;
+		const currentSell = sell[sku];
+		const defaultMin = currentSell?.min || 1;
+		const defaultMax = currentSell?.max || 1;
+		const actionBtn = `
+		<input type="number" id="min-${sku}" value="${defaultMin}" style="width: 40px;">
+		<input type="number" id="max-${sku}" value="${defaultMax}" style="width: 40px;">
+		${
+			inBot
+			? `<button onclick="queueAction('remove','${sku}')">❌</button>
+				<button onclick="queueEdit('${sku}')">✏️</button>`
+			: `<button onclick="queueAction('add','${sku}')">✅</button>`
+		}
+		`;
 
 		const rowClass = showAge
 		  ? (item.age > 2 * 24 * 3600 ? 'outdated-2d' : item.age > 24 * 3600 ? 'outdated-1d' : 'outdated-2h')
@@ -77,11 +87,11 @@ module.exports = function (app, config) {
 	  });
 
 	  const missing = itemList.filter(n => !priced.has(n));
-	  return { outdated, current, missing };
+	  return { outdated, current, missing, sell };
 	}
 
 	router.get('/', (req, res) => {
-	  const { outdated, current, missing } = loadData();
+	  const { outdated, current, missing, sell } = loadData();
 	  const html = `
 		<div class="controls">
 		  <input type="text" id="search" placeholder="Search...">
@@ -92,49 +102,93 @@ module.exports = function (app, config) {
 		</div>
 		<div id="add-item-section">
 		  <h2 id="add-form">Add New Item to item_list.json</h2>
-		  <form method="POST" action="/add-item">
-			<input type="text" name="name" placeholder="New item name..." required>
-			<button type="submit">Add</button>
-		  </form>
+			<form method="POST" action="/add-item">
+				<input type="text" name="name" placeholder="New item name..." required>
+				<button type="submit">Add</button>
+			</form>
 		</div>
 		<div id="queue-panel">
 		  <h3>Pending Actions</h3>
 		  <ul id="queue-list"></ul>
 		  <button onclick="applyQueue()">Apply & Restart</button>
 		</div>
-		<h1>Outdated Items (≥2h): ${outdated.length}</h1><div>${buildTable(outdated, true)}</div>
-		<h1>Current Items: ${current.length}</h1><div>${buildTable(current, false)}</div>
+		<h1>Outdated Items (≥2h): ${outdated.length}</h1><div>${buildTable(outdated, true, sell)}</div>
+		<h1>Current Items: ${current.length}</h1><div>${buildTable(current, false, sell)}</div>
 		<h1>Unpriced Items: ${missing.length}</h1><div>${buildMissingTable(missing)}</div>
 
 		<script>
 		  let queue = [];
-		  function refreshQueue() {
+			function refreshQueue() {
 			const ul = document.getElementById('queue-list');
 			ul.innerHTML = '';
 			queue.forEach(function(q, i) {
-			  const li = document.createElement('li');
-			  const actionText = (q.action === 'add' || q.action === 'addName') ? 'Add ' : 'Remove ';
-			  const nameText = q.sku ? decodeURIComponent(q.sku) : decodeURIComponent(q.name);
-			  li.textContent = actionText + nameText;
-			  li.dataset.index = i;
-			  li.addEventListener('click', function() {
+				const li = document.createElement('li');
+				let actionText = '';
+
+				if (q.action === 'add') {
+				actionText = 'Add ' + q.sku + ' (Min: ' + q.min + ', Max: ' + q.max + ')';
+				} else if (q.action === 'edit') {
+				actionText = 'Edit ' + q.sku + ' (Min: ' + q.min + ', Max: ' + q.max + ')';
+				} else if (q.action === 'remove') {
+				actionText = 'Remove ' + q.sku;
+				} else if (q.action === 'addName') {
+				actionText = 'Add Name ' + decodeURIComponent(q.name);
+				}
+
+				li.textContent = actionText;
+				li.dataset.index = i;
+				li.addEventListener('click', function() {
 				queue.splice(this.dataset.index, 1);
 				refreshQueue();
-			  });
-			  ul.appendChild(li);
+				});
+				ul.appendChild(li);
 			});
-		  }
-		  function queueAction(action, value) {
-			queue.push({ action: action, sku: (action !== 'addName' ? value : null), name: (action === 'addName' ? value : null) });
+			}
+
+			function queueAction(action, value) {
+			queue.push({
+				action,
+				sku: (action !== 'addName' ? value : null),
+				name: (action === 'addName' ? value : null)
+			});
 			refreshQueue();
-		  }
+			}
+			function queueEdit(id) {
+			const min = parseInt(document.getElementById('min-' + id).value) || 1;
+			const max = parseInt(document.getElementById('max-' + id).value) || 1;
+			queue.push({ action: 'edit', sku: id, min, max });
+			refreshQueue();
+			}
+			
 		  async function applyQueue() {
 			if (!queue.length) return;
 			if (!confirm('Apply ' + queue.length + ' changes and restart bot?')) return;
-			for (const q of queue) {
-			  if (q.action === 'add') await fetch('/bot/add', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'sku=' + q.sku});
-			  if (q.action === 'remove') await fetch('/bot/remove', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'sku=' + q.sku});
-			  if (q.action === 'addName') await fetch('/add-item', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'name=' + q.name});
+			for (let i = 0; i < queue.length; i++) {
+			const q = queue[i];
+
+			if (q.action === 'add') {
+				await fetch('/bot/add', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: 'sku=' + q.sku + '&min=' + q.min + '&max=' + q.max
+				});
+			}
+
+			if (q.action === 'remove') {
+				await fetch('/bot/remove', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: 'sku=' + q.sku
+				});
+			}
+
+			if (q.action === 'edit') {
+				await fetch('/bot/edit', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: 'sku=' + q.sku + '&min=' + q.min + '&max=' + q.max
+				});
+			}
 			}
 			queue = [];
 			refreshQueue();
