@@ -46,15 +46,7 @@ function watchPrices(pricelistPath, intervalSec = 7200) {
 
   // Initial check
   checkOldPrices(fullPath);
-
-  // Re-check on file change events
-  fs.watch(fullPath, (eventType) => {
-    if (eventType === 'change') {
-      console.log(`\n[File change detected] Re-checking old prices at ${new Date().toLocaleTimeString()}`);
-      checkOldPrices(fullPath);
-    }
-  });
-
+  
   // Also periodic fallback check
   setInterval(() => {
     console.log(`\n[Periodic check] ${new Date().toLocaleTimeString()}`);

@@ -226,7 +226,7 @@ const adjustPrice = async (name, sku, newBuyPrice, newSellPrice) => {
     try {
         // Adjust the price for both buy and sell based on the logic
         const timestamp = Math.floor(Date.now() / 1000);
-        await insertKeyPrice(newBuyPrice, newSellPrice, timestamp);
+        //await insertKeyPrice(newBuyPrice, newSellPrice, timestamp);
 
         // Create the item object to be added to the pricelist
         const updatedItem = {
@@ -318,25 +318,28 @@ const checkKeyPriceStability = async () => {
           `3h buy  avg moved by ${buyDelta.toFixed(2)} → adjusting to ${roundedBuy}`
         );
       }
-  
-      // 5) fallback: no big swings, write the “latest” 3-hour averages
-      const roundedSell = Methods.getRight(rawSell);
-      const roundedBuy  = Methods.getRight(rawBuy);
 
-      const MIN_STEP = 0.11;
+            
+      const tempRoundedSell = Methods.getRight(rawSell);
+      const tempRoundedBuy  = Methods.getRight(rawBuy);
+      const MIN_STEP = 0.33;
 
       // 6) ensure buy is at least one step below sell
-      if (roundedSell - roundedBuy < MIN_STEP) {
+      if (tempRoundedSell - tempRoundedBuy < MIN_STEP) {
         // carve out exactly one step spread
         rawBuy     = rawSell - MIN_STEP;
-        roundedBuy = Methods.getRight(rawBuy);
-
-        sendPriceAlert(
+        const roundedBuy = Methods.getRight(rawBuy);
+        const roundedSell = Methods.getRight(rawSell);
+        await adjustPrice("Mann Co. Supply Crate Key", "5021;6", roundedBuy, roundedSell);
+        return sendPriceAlert(
             `Spread too tight (${(roundedSell - Methods.getRight(rawBuy + MIN_STEP)).toFixed(2)}); ` +
             `forcing buy to ${roundedBuy} so buy + ${MIN_STEP.toFixed(2)} ≤ sell (${roundedSell}).`
         );
       }
-
+  
+      // 5) fallback: no big swings, write the “latest” 3-hour averages
+      const roundedSell = Methods.getRight(rawSell);
+      const roundedBuy  = Methods.getRight(rawBuy);
 
       await adjustPrice("Mann Co. Supply Crate Key", "5021;6", roundedBuy, roundedSell);
       console.log(
@@ -349,6 +352,17 @@ const checkKeyPriceStability = async () => {
   };
 
 const insertKeyPrice = async (buyPrice, sellPrice, timestamp) => {
+    const lowerBound = keyobj.metal * 0.9;
+    const upperBound = keyobj.metal * 1.1;
+
+    if (
+        buyPrice < lowerBound || buyPrice > upperBound ||
+        sellPrice < lowerBound || sellPrice > upperBound
+    ) {
+        console.warn(`Abnormal key price rejected. Buy: ${buyPrice}, Sell: ${sellPrice}`);
+        return;
+    }
+
     try {
         await db.none(
             `INSERT INTO key_prices (sku, buy_price_metal, sell_price_metal, timestamp) 
@@ -1016,3 +1030,5 @@ const finalisePrice = (arr, name, sku) => {
 };
 
 listen();
+
+module.exports = { db };

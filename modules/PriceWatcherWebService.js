@@ -31,6 +31,42 @@ const pricelistPath = path.resolve(__dirname, '../files/pricelist.json');
 const sellingPricelistPath = path.resolve(__dirname, config.tf2AutobotDir, config.botTradingDir, 'pricelist.json');
 const itemListPath = path.resolve(__dirname, '../files/item_list.json');(__dirname, '../files/item_list.json');
 
+function renderPage(title, bodyContent) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>${title}</title>
+      <style>
+        body { font-family: sans-serif; margin: 0; padding: 0; }
+        nav { background: #333; padding: 10px; }
+        nav a { color: white; margin-right: 15px; text-decoration: none; font-weight: bold; }
+        nav a:hover { text-decoration: underline; }
+        .container { padding: 20px; }
+        body{font-family:sans-serif;margin:0;padding:20px;}nav{position:fixed;top:20px;right:20px;background:#444;color:#fff;padding:10px;border-radius:5px;}
+  nav a{color:#fff;text-decoration:none;margin:5px;display:inline-block;padding:5px 10px;border-radius:3px;}nav a:hover{background:rgba(255,255,255,0.2);} 
+  .controls{margin-bottom:20px;} .controls input[type=text]{padding:5px;width:200px;margin-right:10px;} .controls label{margin-right:15px;}
+  #queue-panel{position:fixed;top:100px;right:0;width:200px;background:#f9f9f9;border:1px solid #ccc;padding:10px;max-height:80vh;overflow:auto;}
+  table{width:100%;border-collapse:collapse;margin-bottom:30px;table-layout:fixed;}th,td{border:1px solid #ccc;padding:8px;text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}th{background:#f0f0f0;}button{cursor:pointer;border:none;background:none;font-size:1em;}
+  .outdated-2h{background:#ffffe0;} .outdated-1d{background:#ffe5b4;} .outdated-2d{background:#f4cccc;} .current-row{background:#e0ffe0;}
+      </style>
+      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    </head>
+    <body>
+      <nav>
+        <a href="/">Price List</a>
+        <a href="/key-prices">Key Graph</a>
+        <a href="/trades">Trade History</a>
+      </nav>
+      <div class="container">
+        ${bodyContent}
+      </div>
+    </body>
+    </html>
+  `;
+}
+
 // In-memory queue of actions
 let queue = [];
 
@@ -104,16 +140,7 @@ function loadData() {
 }
 
 function generateHtml(outdated,current,missing) {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="120">
-  <title>Pricelist Status</title><style>
-  body{font-family:sans-serif;margin:0;padding:20px;}nav{position:fixed;top:20px;right:20px;background:#444;color:#fff;padding:10px;border-radius:5px;}
-  nav a{color:#fff;text-decoration:none;margin:5px;display:inline-block;padding:5px 10px;border-radius:3px;}nav a:hover{background:rgba(255,255,255,0.2);} 
-  .controls{margin-bottom:20px;} .controls input[type=text]{padding:5px;width:200px;margin-right:10px;} .controls label{margin-right:15px;}
-  #queue-panel{position:fixed;top:100px;right:0;width:200px;background:#f9f9f9;border:1px solid #ccc;padding:10px;max-height:80vh;overflow:auto;}
-  table{width:100%;border-collapse:collapse;margin-bottom:30px;table-layout:fixed;}th,td{border:1px solid #ccc;padding:8px;text-align:left;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}th{background:#f0f0f0;}button{cursor:pointer;border:none;background:none;font-size:1em;}
-  .outdated-2h{background:#ffffe0;} .outdated-1d{background:#ffe5b4;} .outdated-2d{background:#f4cccc;} .current-row{background:#e0ffe0;}
-  </style></head><body>
-<nav><a href="#add-form">Add</a><a href="#outdated-section">Outdated</a><a href="#current-section">Current</a><a href="#unpriced-section">Unpriced</a></nav>
+  return `<body>
 <div class="controls"><input type="text" id="search" placeholder="Search..."><label><input type="checkbox" class="filter" id="filter-notinbot"> Not In Bot</label><label><input type="checkbox" class="filter" id="filter-2h"> Age ≥2h</label><label><input type="checkbox" class="filter" id="filter-1d"> Age ≥24h</label><label><input type="checkbox" class="filter" id="filter-3d"> Age ≥72h</label></div>
 <div id="add-item-section"><h2 id="add-form">Add New Item to item_list.json</h2><p>Appends given name to <code>item_list.json</code></p><form method="POST" action="/add-item"><input type="text" name="name" placeholder="New item name..." required><button type="submit">Add</button></form></div>
 <div id="queue-panel"><h3>Pending Actions</h3><ul id="queue-list"></ul><button onclick="applyQueue()">Apply & Restart</button></div>
@@ -182,14 +209,14 @@ document.getElementById('search').addEventListener('input', filterRows);
 document.querySelectorAll('.filter').forEach(function(cb) { cb.addEventListener('change', filterRows); });
 filterRows();
 </script>
-</body></html>`;
+</body>`;
 }
 
 // Mount routes
 function mountRoutes() {
   app.get('/', (req, res) => {
     const { outdated, current, missing } = loadData();
-    res.send(generateHtml(outdated, current, missing));
+    res.send(renderPage("Pricelist Status",generateHtml(outdated, current, missing)));
   });
 
   app.post('/bot/add', (req, res) => {
@@ -249,6 +276,216 @@ function mountRoutes() {
       }
     }
     res.redirect('back');
+  });
+
+  const { db } = require('../bptf-autopricer');
+
+  app.get('/key-prices', async (req, res) => {
+    try {
+      const data = await db.any(`
+        SELECT timestamp, buy_price_metal, sell_price_metal
+        FROM key_prices
+        WHERE created_at > NOW() - INTERVAL '3 days'
+        ORDER BY created_at ASC
+      `);
+
+      const timestamps = data.map(p => new Date(p.timestamp * 1000).toLocaleString());
+      const buyPrices = data.map(p => parseFloat(p.buy_price_metal));
+      const sellPrices = data.map(p => parseFloat(p.sell_price_metal));
+
+      // Basic statistics
+      const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
+      const stdDev = arr => {
+        const avg = mean(arr);
+        return Math.sqrt(arr.map(x => Math.pow(x - avg, 2)).reduce((a, b) => a + b) / arr.length);
+      };
+
+      const stats = {
+        buy: {
+          mean: mean(buyPrices).toFixed(3),
+          std: stdDev(buyPrices).toFixed(3)
+        },
+        sell: {
+          mean: mean(sellPrices).toFixed(3),
+          std: stdDev(sellPrices).toFixed(3)
+        }
+      };
+
+      res.send(renderPage('Key Prices (Last 3 Days)',`
+        <body>
+          <h1>Key Prices (Last 3 Days)</h1>
+          <canvas id="priceChart" width="1000" height="400"></canvas>
+          <p><strong>Buy Price Mean:</strong> ${stats.buy.mean}, <strong>Std Dev:</strong> ${stats.buy.std}</p>
+          <p><strong>Sell Price Mean:</strong> ${stats.sell.mean}, <strong>Std Dev:</strong> ${stats.sell.std}</p>
+          <script>
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            new Chart(ctx, {
+              type: 'line',
+              data: {
+                labels: ${JSON.stringify(timestamps)},
+                datasets: [
+                  {
+                    label: 'Buy Price',
+                    data: ${JSON.stringify(buyPrices)},
+                    borderColor: 'green',
+                    fill: false,
+                    tension: 0.3
+                  },
+                  {
+                    label: 'Sell Price',
+                    data: ${JSON.stringify(sellPrices)},
+                    borderColor: 'red',
+                    fill: false,
+                    tension: 0.3
+                  }
+                ]
+              },
+              options: {
+                responsive: true,
+                plugins: {
+                  title: {
+                    display: true,
+                    text: 'Key Price Trends'
+                  }
+                },
+                scales: {
+                  y: {
+                    title: {
+                      display: true,
+                      text: 'Metal'
+                    }
+                  },
+                  x: {
+                    title: {
+                      display: true,
+                      text: 'Time'
+                    }
+                  }
+                }
+              }
+            });
+          </script>
+        </body>
+      `));
+    } catch (err) {
+      console.error('Failed to load key prices:', err);
+      res.status(500).send('Could not retrieve key price data.');
+    }
+  });
+  app.get('/trades', (req, res) => {
+    const pollDataPath = path.resolve(__dirname, config.tf2AutobotDir, config.botTradingDir, 'polldata.json');
+    const pricelist = loadJson(pricelistPath);
+    const currencyMap = {
+      '5000;6': 'Scrap Metal',
+      '5001;6': 'Reclaimed Metal',
+      '5002;6': 'Refined Metal',
+      '5021;6': 'Mann Co. Supply Crate Key'
+    };
+
+    const skuToName = {
+      ...currencyMap,
+      ...Object.fromEntries(pricelist.items.map(item => [item.sku, item.name]))
+    };
+
+    let trades = [];
+    try {
+      const raw = fs.readFileSync(pollDataPath, 'utf8');
+      const parsed = JSON.parse(raw);
+      const data = parsed.offerData;
+
+      trades = Object.entries(data).map(([id, trade]) => {
+        const profileUrl = trade.partner ? `https://steamcommunity.com/profiles/${trade.partner}` : '#';
+        const name = trade.partner || 'Unknown';
+        const time = new Date((trade.time || trade.actionTimestamp || Date.now()) * 1000).toLocaleString();
+
+        const itemsOur = trade.dict?.our || {};
+        const itemsTheir = trade.dict?.their || {};
+        const valueOur = trade.value?.our || { keys: 0, metal: 0 };
+        const valueTheir = trade.value?.their || { keys: 0, metal: 0 };
+
+        const statusFlags = [];
+        if (trade.isAccepted) statusFlags.push('✅ Accepted');
+        if (trade.isDeclined) statusFlags.push('❌ Declined');
+        if (trade.isInvalid) statusFlags.push('⚠️ Invalid');
+        if (trade.action?.action?.toLowerCase().includes('counter')) statusFlags.push('↩️ Countered');
+        if (trade.action?.action === 'skip') statusFlags.push('⏭️ Skipped');
+
+        return {
+          id,
+          profileUrl,
+          name,
+          time,
+          itemsOur,
+          itemsTheir,
+          valueOur,
+          valueTheir,
+          action: trade.action?.action || 'unknown',
+          reason: trade.action?.reason || '',
+          status: statusFlags.join('<br>') || '⚠️ Unmarked'
+        };
+      }).sort((a, b) => b.time.localeCompare(a.time));
+    } catch (e) {
+      console.error('Error loading polldata:', e);
+      return res.status(500).send('Failed to load trade history');
+    }
+
+    const rows = trades.map(t => `
+      <tr data-status="${t.action}">
+        <td><a href="${t.profileUrl}" target="_blank">${t.id}</a><br><small>${t.name}</small></td>
+        <td>${t.time}</td>
+        <td><strong>Sent:</strong><br>${Object.entries(t.itemsOur).map(([sku, qty]) =>
+          `${qty}× ${skuToName[sku] || 'Unknown'} (${sku})`).join('<br>')}<br>
+          <strong>Value:</strong> ${t.valueOur.keys} Keys, ${t.valueOur.metal} Ref
+        </td>
+        <td><strong>Received:</strong><br>${Object.entries(t.itemsTheir).map(([sku, qty]) =>
+          `${qty}× ${skuToName[sku] || 'Unknown'} (${sku})`).join('<br>')}<br>
+          <strong>Value:</strong> ${t.valueTheir.keys} Keys, ${t.valueTheir.metal} Ref
+        </td>
+        <td>${t.action}<br><small>${t.reason}</small></td>
+        <td>${t.status}</td>
+      </tr>
+    `).join('');
+
+    const html = `
+      <h1>Trade History</h1>
+      <label for="statusFilter"><strong>Filter by Status:</strong></label>
+      <select id="statusFilter" onchange="filterTrades()">
+        <option value="">All</option>
+        <option value="accept">Accepted</option>
+        <option value="decline">Declined</option>
+        <option value="counter">Countered</option>
+        <option value="skip">Skipped</option>
+        <option value="invalid">Invalid</option>
+      </select>
+
+      <table>
+        <thead>
+          <tr><th>Trade ID</th><th>Time</th><th>Sent</th><th>Received</th><th>Action</th><th>Status</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+
+      <style>
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; vertical-align: top; }
+        th { background: #f0f0f0; }
+        td a { color: #0366d6; text-decoration: none; }
+        td a:hover { text-decoration: underline; }
+        select { margin-bottom: 20px; padding: 5px; }
+      </style>
+
+      <script>
+        function filterTrades() {
+          const filter = document.getElementById('statusFilter').value.toLowerCase();
+          document.querySelectorAll('tbody tr').forEach(row => {
+            const status = row.dataset.status.toLowerCase();
+            row.style.display = !filter || status.includes(filter) ? '' : 'none';
+          });
+        }
+      </script>
+    `;
+
+    res.send(renderPage('Trade History', html));
   });
 }
 
