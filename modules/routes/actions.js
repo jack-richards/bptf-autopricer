@@ -4,14 +4,14 @@ const { exec } = require('child_process');
 const { loadJson, saveJson } = require('../utils');
 
 module.exports = function(app, config) {
-  const pricelistPath = path.resolve(__dirname, '../files/pricelist.json');
+  const pricelistPath = path.resolve(__dirname, '../../files/pricelist.json');
   const sellingPricelistPath = path.resolve(
     __dirname,
     config.tf2AutobotDir,
     config.botTradingDir,
     'pricelist.json'
   );
-  const itemListPath = path.resolve(__dirname, '../files/item_list.json');
+  const itemListPath = path.resolve(__dirname, '../../files/item_list.json');
 
   app.post('/bot/add', (req, res) => {
     const sell = loadJson(sellingPricelistPath);
