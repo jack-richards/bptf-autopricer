@@ -12,7 +12,7 @@ const SCHEMA_PATH = './schema.json';
 const PRICELIST_PATH = './files/pricelist.json';
 const ITEM_LIST_PATH = './files/item_list.json';
 const { listen, socketIO } = require('./API/server.js');
-const { startPriceWatcher } = require('./modules/PriceWatcherWebService');
+const { startPriceWatcher } = require('./modules/index');
 
 // Steam API key is required for the schema manager to work.
 const schemaManager = new Schema({
