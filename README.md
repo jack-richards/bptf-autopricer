@@ -45,7 +45,7 @@ Setup & Installation
 1.  Clone this repository and install dependencies:
 
     ```
-    git clone https://github.com/jack-richards/bptf-autopricer.git
+    git clone https://github.com/OliverPerring/bliss-autopricer.git
     cd bptf-autopricer
     npm install
     ```
