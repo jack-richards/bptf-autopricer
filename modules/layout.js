@@ -36,6 +36,21 @@ module.exports = function renderPage(title, bodyContent) {
         overflow: auto;
       }
 
+      .chart-fullscreen {
+        position: absolute;
+        top: 60px; /* adjust if your nav/header is taller */
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 10px;
+      }
+
+      canvas#profitOverTime {
+        width: 100% !important;
+        height: 100% !important;
+        display: block;
+      }
+
       table { width: 100%; border-collapse: collapse; margin-bottom: 30px; table-layout: fixed; }
       th, td {
         border: 1px solid #ccc;
@@ -63,6 +78,7 @@ module.exports = function renderPage(title, bodyContent) {
     <nav>
       <a href="/">Price List</a>
       <a href="/key-prices">Key Graph</a>
+      <a href="/pnl">Profit/Loss</a>
       <a href="/trades">Trade History</a>
       <a href="/logs">Logs</a>
     </nav>
