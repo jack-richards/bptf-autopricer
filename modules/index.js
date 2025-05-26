@@ -29,6 +29,7 @@ function mountRoutes() {
   require('./routes/trades')(app, config);
   require('./routes/key-prices')(app, config);
   require('./routes/actions')(app, config);
+  require('./routes/logs')(app, config);
 }
 
 function startPriceWatcher() {

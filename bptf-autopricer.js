@@ -295,37 +295,47 @@ const checkKeyPriceStability = async () => {
       // prepare fallback values (the “stable” averages)
       let rawSell = sellA;
       let rawBuy  = buyA;
-  
+      const MIN_STEP = 0.33;
+
       // 3) early exit on a big sell swing
       if (Math.abs(sellDelta) > CHANGE_THRESHOLD) {
         rawSell += (sellDelta > 0 ? +0.11 : -0.11);
-        // round both sides
-        const roundedSell = Methods.getRight(rawSell);
-        const roundedBuy  = Methods.getRight(rawBuy);
+        let roundedSell = Methods.getRight(rawSell);
+        let roundedBuy  = Methods.getRight(rawBuy);
+  
+        if (roundedSell - roundedBuy < MIN_STEP) {
+            rawBuy = rawSell - MIN_STEP;
+            roundedBuy = Methods.getRight(rawBuy);
+        }
+  
         await adjustPrice("Mann Co. Supply Crate Key", "5021;6", roundedBuy, roundedSell);
         return sendPriceAlert(
-          `3h sell avg moved by ${sellDelta.toFixed(2)} → adjusting to ${roundedSell}`
+            `3h sell avg moved by ${sellDelta.toFixed(2)} → adjusting to ${roundedSell}`
         );
       }
-
+  
       // 4) early exit on a big buy swing
       if (Math.abs(buyDelta) > CHANGE_THRESHOLD) {
         rawBuy += (buyDelta > 0 ? -0.11 : +0.11);
-        const roundedSell = Methods.getRight(rawSell);
-        const roundedBuy  = Methods.getRight(rawBuy);
+        let roundedSell = Methods.getRight(rawSell);
+        let roundedBuy  = Methods.getRight(rawBuy);
+  
+        if (roundedSell - roundedBuy < MIN_STEP) {
+           rawBuy = rawSell - MIN_STEP;
+           roundedBuy = Methods.getRight(rawBuy);
+        }
+  
         await adjustPrice("Mann Co. Supply Crate Key", "5021;6", roundedBuy, roundedSell);
         return sendPriceAlert(
-          `3h buy  avg moved by ${buyDelta.toFixed(2)} → adjusting to ${roundedBuy}`
+            `3h buy avg moved by ${buyDelta.toFixed(2)} → adjusting to ${roundedBuy}`
         );
       }
-
             
       const tempRoundedSell = Methods.getRight(rawSell);
       const tempRoundedBuy  = Methods.getRight(rawBuy);
-      const MIN_STEP = 0.33;
 
       // 6) ensure buy is at least one step below sell
-      if (tempRoundedSell - tempRoundedBuy < MIN_STEP) {
+      if (tempRoundedSell - tempRoundedBuy <= MIN_STEP) {
         // carve out exactly one step spread
         rawBuy     = rawSell - MIN_STEP;
         const roundedBuy = Methods.getRight(rawBuy);

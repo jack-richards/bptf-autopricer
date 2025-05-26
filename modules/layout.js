@@ -11,6 +11,14 @@ module.exports = function renderPage(title, bodyContent) {
       nav { position: fixed; top: 20px; right: 20px; background: #444; color: #fff; padding: 10px; border-radius: 5px; }
       nav a { color: #fff; text-decoration: none; margin: 5px; display: inline-block; padding: 5px 10px; border-radius: 3px; }
       nav a:hover { background: rgba(255,255,255,0.2); }
+      pre {
+        background: #111;
+        color: #0f0;
+        padding: 1em;
+        font-family: monospace;
+        overflow-x: auto;
+        max-height: 80vh;
+      }
 
       .controls { margin-bottom: 20px; }
       .controls input[type=text] { padding: 5px; width: 200px; margin-right: 10px; }
@@ -56,6 +64,7 @@ module.exports = function renderPage(title, bodyContent) {
       <a href="/">Price List</a>
       <a href="/key-prices">Key Graph</a>
       <a href="/trades">Trade History</a>
+      <a href="/logs">Logs</a>
     </nav>
     <div class="container">
       ${bodyContent}
