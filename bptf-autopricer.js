@@ -375,7 +375,15 @@ schemaManager.init(async function(err) {
     await calculateAndEmitPrices();
 
     //InitialKeyPricingContinued
-    await checkKeyPriceStability();
+    await checkKeyPriceStability({
+        db,
+        Methods,
+        keyobj,
+        adjustPrice,
+        sendPriceAlert,
+        PRICELIST_PATH,
+        socketIO
+    });
 
     // Listen for events from the bptf socket.
     rws.addEventListener('message', event => {
