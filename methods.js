@@ -6,6 +6,7 @@ const AsyncLock = require('async-lock');
 const lock = new AsyncLock();
 
 const config = require('./config.json');
+const CACHE_FILE_PATH = path.resolve(__dirname, 'cached-pricelist.json');
 
 Methods.prototype.halfScrapToRefined = function(halfscrap) {
     var refined = parseFloat((halfscrap / 18).toString().match(/^-?\d+(?:\.\d{0,2})?/)[0]);
@@ -375,20 +376,29 @@ Methods.prototype.getKeyFromExternalAPI = async function() {
 };
 
 Methods.prototype.getExternalPricelist = async function() {
-    // We attempt to get the cached version
-    // of the prices.tf list from autobot.tf
-    try {
-        const autobotResponse = await axios.get('https://autobot.tf/json/pricelist-array');
-        if (autobotResponse.data.items.length > 0) {
-            // The response has actually provided prices.
-            var pricesTF_Pricelist = autobotResponse.data;
-            return pricesTF_Pricelist;
-        } else {
-            throw new Error("No items in external pricelist.");
-        }
-    } catch (e) {
-        throw new Error("Couldn't fetch external pricelist from autobot.tf", e);
+  try {
+    const response = await axios.get('https://autobot.tf/json/pricelist-array');
+    if (!response.data || !Array.isArray(response.data.items) || response.data.items.length === 0) {
+      throw new Error('No items in external pricelist.');
     }
+    // Cache the fetched pricelist to file
+    try {
+      await fs.promises.writeFile(CACHE_FILE_PATH, JSON.stringify(response.data, null, 2), 'utf-8');
+    } catch (writeErr) {
+      console.warn(`Failed to write cache file at ${CACHE_FILE_PATH}: ${writeErr.message}`);
+    }
+    return response.data;
+  } catch (err) {
+    console.warn(`Could not fetch external pricelist, falling back to cache: ${err.message}`);
+    try {
+      const cached = await fs.promises.readFile(CACHE_FILE_PATH, 'utf-8');
+      const data = JSON.parse(cached);
+      return data;
+    } catch (cacheErr) {
+      throw new Error(`Failed to fetch external pricelist and no valid cache available: ${cacheErr.message}`);
+    }
+  }
 };
+
 
 module.exports = Methods;
