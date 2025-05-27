@@ -634,8 +634,9 @@ const filterOutliers = listingsArray => {
     // trusted steamids (when applicable).
     var filteredMean = 0;
     for (var i = 0; i <= 2; i++) {
-        filteredMean = +Methods.toMetal(filteredListings[i].currencies, keyobj.metal);
+        filteredMean += +Methods.toMetal(filteredListings[i].currencies, keyobj.metal);
     }
+    filteredMean /= 3;
 
     // Validate the mean.
     if (!filteredMean || isNaN(filteredMean) || filteredMean === 0) {
