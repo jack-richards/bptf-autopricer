@@ -263,7 +263,7 @@ Methods.prototype.getListingsFromSnapshots = async function(name) {
 Methods.prototype.getJWTFromPricesTF = async function(page, limit) {
     let tries = 1;
 
-    while (tries <= 5) {
+    while (tries <= 3) {
         try {
             const response = await axios.post('https://api2.prices.tf/auth/access');
             if (response.status === 200) {
