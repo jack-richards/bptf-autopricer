@@ -13,6 +13,13 @@ const PRICELIST_PATH = './files/pricelist.json';
 const ITEM_LIST_PATH = './files/item_list.json';
 const { listen, socketIO } = require('./API/server.js');
 const { startPriceWatcher } = require('./modules/index');
+const {
+    sendPriceAlert,
+    cleanupOldKeyPrices,
+    insertKeyPrice,
+    adjustPrice,
+    checkKeyPriceStability
+} = require('./modules/keyPriceUtils');
 
 // Steam API key is required for the schema manager to work.
 const schemaManager = new Schema({
@@ -209,180 +216,7 @@ const updateFromSnapshot = async (name, sku) => {
     }
 }
 
-const cleanupOldKeyPrices = async () => {
-    try {
-        await db.none(
-            `DELETE FROM key_prices WHERE created_at < NOW() - INTERVAL '30 days'`
-        );
-        console.log("Cleaned up key prices older than 30 days.");
-    } catch (err) {
-        console.error("Error cleaning up old key prices");
-    }
-};
 
-const CHANGE_THRESHOLD = 0.33;  // Threshold for price movement (up or down)
-
-const adjustPrice = async (name, sku, newBuyPrice, newSellPrice) => {
-    try {
-        // Adjust the price for both buy and sell based on the logic
-        const timestamp = Math.floor(Date.now() / 1000);
-        //await insertKeyPrice(newBuyPrice, newSellPrice, timestamp);
-
-        // Create the item object to be added to the pricelist
-        const updatedItem = {
-            name: name,
-            sku: sku,
-            source: 'bptf',
-            buy: {
-                keys: 0,
-                metal: newBuyPrice,
-            },
-            sell: {
-                keys: 0,
-                metal: newSellPrice,
-            },
-            time: timestamp
-        };
-
-        // Add the updated item to the pricelist
-        Methods.addToPricelist(updatedItem, PRICELIST_PATH); // Add updated item to pricelist
-
-        // Emit the updated price
-        socketIO.emit('price', updatedItem); // Emit the new price to the front-end
-
-        console.log(`Price for ${name} updated. Buy: ${newBuyPrice}, Sell: ${newSellPrice}`);
-    } catch (err) {
-        console.error("Error adjusting price");
-    }
-};
-
-const sendPriceAlert = (message) => {
-    console.log(`ALERT: ${message}`);
-    // Here you can integrate with a notification system (email, Slack, etc.)
-};
-
-const checkKeyPriceStability = async () => {
-    try {
-      // 1) get the two 3-hour averages
-      const [{ avg_buy: buyA, avg_sell: sellA }] = await db.any(`
-        SELECT
-          AVG(buy_price_metal)::float AS avg_buy,
-          AVG(sell_price_metal)::float AS avg_sell
-        FROM key_prices
-        WHERE sku = '5021;6'
-          AND created_at BETWEEN NOW() - INTERVAL '3 hours' AND NOW();
-      `);
-  
-      const [{ avg_buy: buyB, avg_sell: sellB }] = await db.any(`
-        SELECT
-          AVG(buy_price_metal)::float AS avg_buy,
-          AVG(sell_price_metal)::float AS avg_sell
-        FROM key_prices
-        WHERE sku = '5021;6'
-          AND created_at BETWEEN NOW() - INTERVAL '6 hours' AND NOW() - INTERVAL '3 hours';
-      `);
-  
-      // if either window has no data, bail early (or you could fallback to last‐row instead)
-      if (buyA == null || sellA == null || buyB == null || sellB == null) {
-        console.log("Not enough data in one of the 3-hour windows—skipping volatility check.");
-        return;
-      }
-  
-      // 2) compute deltas
-      const sellDelta = sellA - sellB;
-      const buyDelta  = buyA  - buyB;
-  
-      // prepare fallback values (the “stable” averages)
-      let rawSell = sellA;
-      let rawBuy  = buyA;
-      const MIN_STEP = 0.33;
-
-      // 3) early exit on a big sell swing
-      if (Math.abs(sellDelta) > CHANGE_THRESHOLD) {
-        rawSell += (sellDelta > 0 ? +0.11 : -0.11);
-        let roundedSell = Methods.getRight(rawSell);
-        let roundedBuy  = Methods.getRight(rawBuy);
-  
-        if (roundedSell - roundedBuy < MIN_STEP) {
-            rawBuy = rawSell - MIN_STEP;
-            roundedBuy = Methods.getRight(rawBuy);
-        }
-  
-        await adjustPrice("Mann Co. Supply Crate Key", "5021;6", roundedBuy, roundedSell);
-        return sendPriceAlert(
-            `3h sell avg moved by ${sellDelta.toFixed(2)} → adjusting to ${roundedSell}`
-        );
-      }
-  
-      // 4) early exit on a big buy swing
-      if (Math.abs(buyDelta) > CHANGE_THRESHOLD) {
-        rawBuy += (buyDelta > 0 ? -0.11 : +0.11);
-        let roundedSell = Methods.getRight(rawSell);
-        let roundedBuy  = Methods.getRight(rawBuy);
-  
-        if (roundedSell - roundedBuy < MIN_STEP) {
-           rawBuy = rawSell - MIN_STEP;
-           roundedBuy = Methods.getRight(rawBuy);
-        }
-  
-        await adjustPrice("Mann Co. Supply Crate Key", "5021;6", roundedBuy, roundedSell);
-        return sendPriceAlert(
-            `3h buy avg moved by ${buyDelta.toFixed(2)} → adjusting to ${roundedBuy}`
-        );
-      }
-            
-      const tempRoundedSell = Methods.getRight(rawSell);
-      const tempRoundedBuy  = Methods.getRight(rawBuy);
-
-      // 6) ensure buy is at least one step below sell
-      if (tempRoundedSell - tempRoundedBuy <= MIN_STEP) {
-        // carve out exactly one step spread
-        rawBuy     = rawSell - MIN_STEP;
-        const roundedBuy = Methods.getRight(rawBuy);
-        const roundedSell = Methods.getRight(rawSell);
-        await adjustPrice("Mann Co. Supply Crate Key", "5021;6", roundedBuy, roundedSell);
-        return sendPriceAlert(
-            `Spread too tight (${(roundedSell - Methods.getRight(rawBuy + MIN_STEP)).toFixed(2)}); ` +
-            `forcing buy to ${roundedBuy} so buy + ${MIN_STEP.toFixed(2)} ≤ sell (${roundedSell}).`
-        );
-      }
-  
-      // 5) fallback: no big swings, write the “latest” 3-hour averages
-      const roundedSell = Methods.getRight(rawSell);
-      const roundedBuy  = Methods.getRight(rawBuy);
-
-      await adjustPrice("Mann Co. Supply Crate Key", "5021;6", roundedBuy, roundedSell);
-      console.log(
-        `Stable over last 6h (windows avg buy=${roundedBuy}, sell=${roundedSell}). Change delta for buy=${buyDelta} and change delta for sell=${sellDelta}`
-      );
-  
-    } catch (err) {
-      console.error("Error checking key price stability:", err);
-    }
-  };
-
-const insertKeyPrice = async (buyPrice, sellPrice, timestamp) => {
-    const lowerBound = keyobj.metal * 0.9;
-    const upperBound = keyobj.metal * 1.1;
-
-    if (
-        buyPrice < lowerBound || buyPrice > upperBound ||
-        sellPrice < lowerBound || sellPrice > upperBound
-    ) {
-        console.warn(`Abnormal key price rejected. Buy: ${buyPrice}, Sell: ${sellPrice}`);
-        return;
-    }
-
-    try {
-        await db.none(
-            `INSERT INTO key_prices (sku, buy_price_metal, sell_price_metal, timestamp) 
-            VALUES ($1, $2, $3, $4)`,
-            ['5021;6', buyPrice, sellPrice, timestamp]
-        );
-    } catch (err) {
-        console.error("Error inserting key price");
-    }
-};
 
 const calculateAndEmitPrices = async () => {
     let item_objects = [];
@@ -412,7 +246,7 @@ const calculateAndEmitPrices = async () => {
                 const buyPrice = item.buy.metal;
                 const sellPrice = item.sell.metal;
                 const timestamp = Math.floor(Date.now() / 1000);
-                await insertKeyPrice(buyPrice, sellPrice, timestamp);
+                await insertKeyPrice(db, keyobj, buyPrice, sellPrice, timestamp);
                 continue;
             }
 
@@ -570,11 +404,19 @@ schemaManager.init(async function(err) {
     }, 15 * 60 * 1000); // Every 15 minutes.
 
     setInterval(async () => {
-        await cleanupOldKeyPrices();
+        await cleanupOldKeyPrices(db);
     }, 30 * 60 * 1000); // Cleanup old key prices every 30 minutes (more than 3 days old)
     
     setInterval(async () => {
-        await checkKeyPriceStability();
+        await checkKeyPriceStability({
+            db,
+            Methods,
+            keyobj,
+            adjustPrice,
+            sendPriceAlert,
+            PRICELIST_PATH,
+            socketIO
+        });
     }, 30 * 60 * 1000); // Check key price stability every 30 minutes
 	
 	startPriceWatcher(); //start webpage for price watching 
