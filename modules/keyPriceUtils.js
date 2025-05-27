@@ -65,7 +65,7 @@ async function adjustPrice({ name, sku, newBuyPrice, newSellPrice, Methods, PRIC
     }
 }
 
-async function checkKeyPriceStability({ db, Methods, keyobj, adjustPrice, sendPriceAlert }) {
+async function checkKeyPriceStability({ db, Methods, keyobj, adjustPrice, sendPriceAlert, socketIO }) {
     const CHANGE_THRESHOLD = 0.33;
     try {
         const [{ avg_buy: buyA, avg_sell: sellA }] = await db.any(`
