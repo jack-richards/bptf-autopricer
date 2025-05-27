@@ -212,9 +212,9 @@ const updateFromSnapshot = async (name, sku) => {
 const cleanupOldKeyPrices = async () => {
     try {
         await db.none(
-            `DELETE FROM key_prices WHERE created_at < NOW() - INTERVAL '3 days'`
+            `DELETE FROM key_prices WHERE created_at < NOW() - INTERVAL '30 days'`
         );
-        console.log("Cleaned up key prices older than 3 days.");
+        console.log("Cleaned up key prices older than 30 days.");
     } catch (err) {
         console.error("Error cleaning up old key prices");
     }
