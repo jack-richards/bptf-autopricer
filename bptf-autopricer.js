@@ -145,11 +145,19 @@ const updateKeyObject = async () => {
   socketIO.emit('price', key_item);
 };
 
-const rws = new ReconnectingWebSocket('wss://ws.backpack.tf/events/', undefined, {
-    WebSocket: ws,
-    headers: {
-        'batch-test': true
-    }
+const { initBptfWebSocket } = require('./websocket/bptfWebSocket');
+
+// Initialize the websocket and pass in dependencies
+const rws = initBptfWebSocket({
+    allowedItemNames,
+    schemaManager,
+    Methods,
+    insertListing,
+    deleteRemovedListing,
+    excludedSteamIds,
+    excludedListingDescriptions,
+    blockedAttributes,
+    logFile
 });
 
 let allowedItemNames = new Set();
@@ -175,29 +183,6 @@ const watcher = chokidar.watch(ITEM_LIST_PATH);
 // When the JSON file changes, re-read and update the Set of item names.
 watcher.on('change', path => {
     loadNames();
-});
-
-function logWebSocketEvent(message) {
-    const timestamp = new Date().toISOString();
-    fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`);
-}
-
-rws.addEventListener('open', event => {
-    const msg = 'Connected to socket.';
-    console.log(msg);
-    logWebSocketEvent(msg);
-});
-
-rws.addEventListener('close', event => {
-    const msg = `WebSocket connection closed. ${event.reason || ''}`;
-    console.warn(msg);
-    logWebSocketEvent(msg);
-});
-
-rws.addEventListener('error', event => {
-    const msg = `WebSocket encountered an error: ${event.message || event}`;
-    console.error(msg);
-    logWebSocketEvent(msg);
 });
 
 const countListingsForItem = async (name) => {
@@ -237,8 +222,6 @@ const updateFromSnapshot = async (name, sku) => {
         await insertListings(unformatedListings, sku, name);
     }
 }
-
-
 
 const calculateAndEmitPrices = async () => {
     let item_objects = [];
@@ -290,90 +273,6 @@ const calculateAndEmitPrices = async () => {
         socketIO.emit('price', item);
     }
 };
-
-function handleEvent(e) {
-    // Only process relevant events.
-    if (allowedItemNames.has(e.payload.item.name)) {
-        let response_item = e.payload.item;
-        let steamid = e.payload.steamid;
-        let intent = e.payload.intent;
-        switch (e.event) {
-            case 'listing-update':
-                let currencies = e.payload.currencies;
-                let listingDetails = e.payload.details;
-                let listingItemObject = e.payload.item; // The item object where paint and stuff is stored.
-
-                // If userAgent field is not present, return.
-                // This indicates that the listing was not created by a bot.
-                if (!e.payload.userAgent) {
-                    return;
-                }
-
-                // Make sure currencies object contains at least one key related to metal or keys.
-                if (!Methods.validateObject(currencies)) {
-                    return;
-                }
-
-                // Filter out painted items.
-                if (listingItemObject.attributes && listingItemObject.attributes.some(attribute => {
-                    return typeof attribute === 'object' && // Ensure the attribute is an object.
-                        attribute.float_value &&  // Ensure the attribute has a float_value.
-                        // Check if the float_value is in the blockedAttributes object.
-                        Object.values(blockedAttributes).map(String).includes(String(attribute.float_value)) &&
-                        // Ensure the name of the item doesn't include any of the keys in the blockedAttributes object.
-                        !Object.keys(blockedAttributes).some(key => name.includes(key));
-                })) {
-                    return;  // Skip this listing. Listing is for a painted item.
-                }
-
-                // Create a currencies object that contains only metal and keys.
-                currencies = Methods.createCurrencyObject(currencies);
-
-                // Filter out listing if it's owned by blacklisted ID.
-                if (!excludedSteamIds.some(id => steamid === id)) {
-                    // Perform further filtering to ignore listing if it mentions spells in it's description.
-                    // Prices tend to be significantly different for spelled items.
-                    // Splits description up into whole words, meaning if "Ex" is a blocked description term then
-                    // the word "Explosion" will not cause a false positive.
-                    if (
-                        listingDetails && 
-                        !excludedListingDescriptions.some(detail =>
-                            new RegExp(`\\b${detail}\\b`, 'i').test(
-                                listingDetails.normalize('NFKD').toLowerCase().trim()
-                            )
-                        )
-                    )
-                    {
-                        try {
-                            // Generate SKU from name. Found out that a perfect version of this method was already
-                            // created by the developers who worked on tf2autobot. I believe they forked Nicklasons
-                            // original module and then added a bunch more features.
-                            var sku = schemaManager.schema.getSkuFromName(response_item.name);
-                            if (sku === null || sku === undefined) {
-                                throw new Error(
-                                    `| UPDATING PRICES |: Couldn't price ${response_item.name}. Issue with retrieving this items defindex.`
-                                );
-                            }
-                            insertListing(response_item, sku, currencies, intent, steamid);
-                        } catch (e) {
-                            console.log(e);
-                            console.log("Couldn't create a price for " + response_item.name);
-                        }
-                    }
-                }
-                break;
-            case 'listing-delete':
-                try {
-                    // Removes the listing that has been deleted from backpack.tf from our database.
-                    deleteRemovedListing(steamid, response_item.name, intent);
-                } catch (e) {
-                    // console.log(e);
-                    return;
-                }
-                break;
-        }
-    }
-}
 
 // When the schema manager is ready we proceed.
 schemaManager.init(async function(err) {
@@ -865,9 +764,9 @@ const finalisePrice = (arr, name, sku) => {
 
             // We are taking the buy array price as a whole, and also passing in the current selling price
             // for a key into the parsePrice method.
-            arr[0] = Methods.parsePrice(arr[0], keyobj.metal);
             // We are taking the sell array price as a whole, and also passing in the current selling price
             // for a key into the parsePrice method.
+            arr[0] = Methods.parsePrice(arr[0], keyobj.metal);
             arr[1] = Methods.parsePrice(arr[1], keyobj.metal);
 
             // Calculates the pure value of the keys involved and adds it to the pure metal.
