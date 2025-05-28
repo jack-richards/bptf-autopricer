@@ -33,6 +33,9 @@ function initBptfWebSocket({
             let intent = e.payload.intent;
             switch (e.event) {
                 case 'listing-update':
+
+                    console.log("Recieved a socket listing update for : " + response_item.name);
+
                     let currencies = e.payload.currencies;
                     let listingDetails = e.payload.details;
                     let listingItemObject = e.payload.item;
@@ -76,6 +79,9 @@ function initBptfWebSocket({
                     }
                     break;
                 case 'listing-delete':
+
+                    console.log("Recieved a socket listing delete for : " + response_item.name);
+
                     try {
                         deleteRemovedListing(steamid, response_item.name, intent);
                     } catch (e) {
