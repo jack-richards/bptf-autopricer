@@ -20,6 +20,9 @@ const {
     adjustPrice,
     checkKeyPriceStability
 } = require('./modules/keyPriceUtils');
+const logDir = path.join(__dirname, 'logs');
+const logFile = path.join(logDir, 'websocket.log');
+if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
 
 // Steam API key is required for the schema manager to work.
 const schemaManager = new Schema({
@@ -174,8 +177,27 @@ watcher.on('change', path => {
     loadNames();
 });
 
+function logWebSocketEvent(message) {
+    const timestamp = new Date().toISOString();
+    fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`);
+}
+
 rws.addEventListener('open', event => {
-    console.log('Connected to socket.');
+    const msg = 'Connected to socket.';
+    console.log(msg);
+    logWebSocketEvent(msg);
+});
+
+rws.addEventListener('close', event => {
+    const msg = `WebSocket connection closed. ${event.reason || ''}`;
+    console.warn(msg);
+    logWebSocketEvent(msg);
+});
+
+rws.addEventListener('error', event => {
+    const msg = `WebSocket encountered an error: ${event.message || event}`;
+    console.error(msg);
+    logWebSocketEvent(msg);
 });
 
 const countListingsForItem = async (name) => {
