@@ -24,6 +24,10 @@ const logDir = path.join(__dirname, 'logs');
 const logFile = path.join(logDir, 'websocket.log');
 if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
 
+const logDir = path.join(__dirname, 'logs');
+const logFile = path.join(logDir, 'websocket.log');
+if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
+
 // Steam API key is required for the schema manager to work.
 const schemaManager = new Schema({
     apiKey: config.steamAPIKey
