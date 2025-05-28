@@ -190,26 +190,6 @@ const countListingsForItem = async (name) => {
     }
 };
 
-const updateFromSnapshot = async (name, sku) => {
-    // Check if always call snapshot API setting is enabled.
-    if (!alwaysQuerySnapshotAPI) {
-        // Check if required number of listings already exist in database for item.
-        // If not we need to query the snapshots API.
-        let callSnapshot = await countListingsForItem(name);
-        if(callSnapshot) {
-            // Get listings from snapshot API.
-            let unformatedListings = await Methods.getListingsFromSnapshots(name);
-            // Insert snapshot listings.
-            await insertListings(unformatedListings, sku, name);
-        }
-    } else {
-        // Get listings from snapshot API.
-        let unformatedListings = await Methods.getListingsFromSnapshots(name);
-        // Insert snapshot listings.
-        await insertListings(unformatedListings, sku, name);
-    }
-}
-
 const calculateAndEmitPrices = async () => {
     let item_objects = [];
     for (const name of allowedItemNames) {
@@ -218,8 +198,6 @@ const calculateAndEmitPrices = async () => {
             let sku = schemaManager.schema.getSkuFromName(name);
             // Delete old listings from database.
             await deleteOldListings();
-            // Use snapshot API to populate database with listings for item.
-            await updateFromSnapshot(name, sku);
             // Start process of pricing item.
             let arr = await determinePrice(name, sku);
             let item = finalisePrice(arr, name, sku);
@@ -537,7 +515,7 @@ const deleteOldListings = async () => {
     if (inActive.length > 0) {
         await db.none(
             `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
-            [rare, 24 * 3600]
+            [inActive, 24 * 3600]
         );
     }
     // Batch delete for rare (48h)
