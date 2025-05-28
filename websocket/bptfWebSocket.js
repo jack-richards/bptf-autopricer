@@ -87,19 +87,19 @@ function initBptfWebSocket({
     }
 
     rws.addEventListener('open', event => {
-        const msg = 'Connected to socket.';
+        const msg = 'Connected to bptf socket.';
         console.log(msg);
         logWebSocketEvent(logFile, msg);
     });
 
     rws.addEventListener('close', event => {
-        const msg = `WebSocket connection closed. ${event.reason || ''}`;
+        const msg = `bptf Socket connection closed. ${event.reason || ''}`;
         console.warn(msg);
         logWebSocketEvent(logFile, msg);
     });
 
     rws.addEventListener('error', event => {
-        const msg = `WebSocket encountered an error: ${event.message || event}`;
+        const msg = `bptf Socket encountered an error: ${event.message || event}`;
         console.error(msg);
         logWebSocketEvent(logFile, msg);
     });

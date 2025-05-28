@@ -147,19 +147,6 @@ const updateKeyObject = async () => {
 
 const { initBptfWebSocket } = require('./websocket/bptfWebSocket');
 
-// Initialize the websocket and pass in dependencies
-const rws = initBptfWebSocket({
-    allowedItemNames,
-    schemaManager,
-    Methods,
-    insertListing,
-    deleteRemovedListing,
-    excludedSteamIds,
-    excludedListingDescriptions,
-    blockedAttributes,
-    logFile
-});
-
 let allowedItemNames = new Set();
 
 // Read and initialize the names of the items we want to get prices for.
@@ -810,6 +797,19 @@ const finalisePrice = (arr, name, sku) => {
         return;
     }
 };
+
+// Initialize the websocket and pass in dependencies
+const rws = initBptfWebSocket({
+    allowedItemNames,
+    schemaManager,
+    Methods,
+    insertListing,
+    deleteRemovedListing,
+    excludedSteamIds,
+    excludedListingDescriptions,
+    blockedAttributes,
+    logFile
+});
 
 listen();
 
