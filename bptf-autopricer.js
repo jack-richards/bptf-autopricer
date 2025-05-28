@@ -247,6 +247,7 @@ async function updateMovingAverages(alpha = 0.2) {
     `);
 }
 
+// Initialize listing stats for all SKUs in the database.
 async function initializeListingStats() {
     const skus = await db.any(`SELECT DISTINCT sku FROM listings`);
     for (const { sku } of skus) {
@@ -353,105 +354,6 @@ const insertListing = async (response_item, sku, currencies, intent, steamid) =>
     );
     await updateListingStats(sku);
     return result;
-};
-
-const insertListings = async (unformattedListings, sku, name) => {
-    // If there are no listings from the snapshot just return. No update can be done.
-    if (!unformattedListings) {
-        throw new Error(`No listings found for ${name} in the snapshot. The name: '${name}' likely doesn't match the version on the items bptf listings page.`);
-    }
-    try {
-        let formattedListings = [];
-        const uniqueSet = new Set(); // Create a set to store unique combinations
-
-        // Calculate timestamp once, no point doing it for each iteration.
-        // We take 60 seconds from the timestamp as snapshots results can be up to a minute old.
-        // This allows us to essentially prioritise keeping the listings in the database that
-        // were added by the websocket. As we know they are the most up-to-date.
-        let updated = Math.floor(Date.now() / 1000) - 60;
-
-        for (const listing of unformattedListings) {
-            if (
-                listing.details && 
-                excludedListingDescriptions.some(detail =>
-                    new RegExp(`\\b${detail}\\b`, 'i').test(
-                        listing.details.normalize('NFKD').toLowerCase().trim()
-                    )
-                )
-            ) {
-                // Skip this listing. Listing is for a spelled item.
-                continue;
-            }
-
-            // The item object where paint and stuff is stored.
-            const listingItemObject = listing.item;
-
-            // Filter out painted items.
-            if (listingItemObject.attributes && listingItemObject.attributes.some(attribute => {
-                return typeof attribute === 'object' && // Ensure the attribute is an object.
-                    attribute.float_value &&  // Ensure the attribute has a float_value.
-                    // Check if the float_value is in the blockedAttributes object.
-                    Object.values(blockedAttributes).map(String).includes(String(attribute.float_value)) &&
-                    // Ensure the name of the item doesn't include any of the keys in the blockedAttributes object.
-                    !Object.keys(blockedAttributes).some(key => name.includes(key));
-            })) {
-                continue;  // Skip this listing. Listing is for a painted item.
-            }
-
-            // If userAgent field is not present, continue.
-            // This indicates that the listing was not created by a bot.
-            if (!listing.userAgent) {
-                continue;
-            }
-
-            // Create a unique key for each listing comprised
-            // of each key of the composite primary key.
-            const uniqueKey = `${listing.steamid}-${name}-${sku}-${listing.intent}`;
-            // Check if this combination is already in the uniqueSet
-            if (uniqueSet.has(uniqueKey)) {
-                // Duplicate entry, skip this listing.
-                continue;
-            }
-            // Add the unique combination to the set
-            uniqueSet.add(uniqueKey);
-
-            let formattedListing = {};
-            // We set name to what we know it should be.
-            formattedListing.name = name;
-            // We set the sku to what we generated.
-            formattedListing.sku = sku;
-            let currenciesValid = Methods.validateObject(listing.currencies);
-            // If currencies is invalid.
-            if (!currenciesValid) {
-                // Skip this listing.
-                continue;
-            }
-            let validatedCurrencies = Methods.createCurrencyObject(listing.currencies);
-            formattedListing.currencies = JSON.stringify(validatedCurrencies);
-            formattedListing.intent = listing.intent;
-            formattedListing.updated = updated;
-            formattedListing.steamid = listing.steamid;
-
-            formattedListings.push(formattedListing);
-        }
-
-        if (formattedListings.length > 0) {
-            // Bulk insert rows into the table using pg-promise module.
-            // I only update the listings if the updated timestamp is greater than the current one.
-            // We do this to ensure that we don't overwrite a newer listing with an older one.
-            const query =
-                pgp.helpers.insert(formattedListings, cs, 'listings') +
-                ` ON CONFLICT (name, sku, intent, steamid)\
-                DO UPDATE SET currencies = excluded.currencies, updated = excluded.updated\
-                WHERE excluded.updated > listings.updated;`;
-
-            await db.none(query);
-        }
-        return;
-    } catch (e) {
-        console.log(e);
-        throw e;
-    }
 };
 
 // Arguably quite in-efficient but I don't see a good alternative at the moment.
