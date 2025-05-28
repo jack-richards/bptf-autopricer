@@ -178,6 +178,14 @@ rws.addEventListener('open', event => {
     console.log('Connected to socket.');
 });
 
+rws.addEventListener('close', event => {
+    console.warn('WebSocket connection closed.', event.reason || '');
+});
+
+rws.addEventListener('error', event => {
+    console.error('WebSocket encountered an error:', event.message || event);
+});
+
 const countListingsForItem = async (name) => {
     try {
         const result = await db.one(`
