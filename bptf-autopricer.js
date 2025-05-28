@@ -292,17 +292,6 @@ schemaManager.init(async function(err) {
         PRICELIST_PATH,
         socketIO
     });
-
-    // Listen for events from the bptf socket.
-    rws.addEventListener('message', event => {
-        var json = JSON.parse(event.data);
-        // forwards-compatible support of the batch mode, if you did not set the batch-test header.
-        if (json instanceof Array) {
-            json.forEach(handleEvent); // handles the new event format
-        } else {
-            handleEvent(json); // old event-per-frame message format - DEPRECATED!
-        }
-    });
     
     // Set-up timers for updating key-object, external pricelist and creating prices from listing data.
     // Get external pricelist every 30 mins.
