@@ -34,7 +34,7 @@ function initBptfWebSocket({
             switch (e.event) {
                 case 'listing-update':
 
-                    console.log("Recieved a socket listing update for : " + response_item.name);
+                    console.log("[WebSocket] Recieved a socket listing update for : " + response_item.name);
 
                     let currencies = e.payload.currencies;
                     let listingDetails = e.payload.details;
@@ -80,7 +80,7 @@ function initBptfWebSocket({
                     break;
                 case 'listing-delete':
 
-                    console.log("Recieved a socket listing delete for : " + response_item.name);
+                    console.log("[WebSocket] Recieved a socket listing delete for : " + response_item.name);
 
                     try {
                         deleteRemovedListing(steamid, response_item.name, intent);
@@ -93,19 +93,19 @@ function initBptfWebSocket({
     }
 
     rws.addEventListener('open', event => {
-        const msg = 'Connected to bptf socket.';
+        const msg = '[WebSocket] Connected to bptf socket.';
         console.log(msg);
         logWebSocketEvent(logFile, msg);
     });
 
     rws.addEventListener('close', event => {
-        const msg = `bptf Socket connection closed. ${event.reason || ''}`;
+        const msg = `[WebSocket] bptf Socket connection closed. ${event.reason || ''}`;
         console.warn(msg);
         logWebSocketEvent(logFile, msg);
     });
 
     rws.addEventListener('error', event => {
-        const msg = `bptf Socket encountered an error: ${event.message || event}`;
+        const msg = `[WebSocket] bptf Socket encountered an error: ${event.message || event}`;
         console.error(msg);
         logWebSocketEvent(logFile, msg);
     });
@@ -122,7 +122,7 @@ function initBptfWebSocket({
             console.log(`[WebSocket] Received batch: ${json.length} events (${updateCount} updates, ${deleteCount} deletions)`);
             json.forEach(handleEvent);
         } else {
-            console.log(`Received single bptf event`);
+            console.log(`[WebSocket] Received single bptf event`);
             handleEvent(json);
         }
     });
