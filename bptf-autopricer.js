@@ -264,14 +264,28 @@ const calculateAndEmitPrices = async () => {
 // Exponential moving average update
 async function updateMovingAverages(alpha = 0.2) {
     const stats = await db.any(`SELECT sku, current_count, moving_avg_count FROM listing_stats`);
-    for (const row of stats) {
+    if (stats.length === 0) return;
+
+    // Prepare batch update data
+    const updates = stats.map(row => {
         const prevAvg = row.moving_avg_count || row.current_count;
         const newAvg = alpha * row.current_count + (1 - alpha) * prevAvg;
-        await db.none(
-            `UPDATE listing_stats SET moving_avg_count = $1, last_updated = NOW() WHERE sku = $2`,
-            [newAvg, row.sku]
-        );
-    }
+        return {
+            sku: row.sku,
+            moving_avg_count: newAvg
+        };
+    });
+
+    // Batch update using VALUES and JOIN
+    const cs = new pgp.helpers.ColumnSet(['sku', 'moving_avg_count'], { table: 'tmp' });
+    const values = pgp.helpers.values(updates, cs);
+
+    await db.none(`
+        UPDATE listing_stats AS ls
+        SET moving_avg_count = tmp.moving_avg_count, last_updated = NOW()
+        FROM (VALUES ${values}) AS tmp(sku, moving_avg_count)
+        WHERE ls.sku = tmp.sku
+    `);
 }
 
 async function initializeListingStats() {
@@ -489,22 +503,51 @@ const insertListings = async (unformattedListings, sku, name) => {
 
 // Otherwise, if the listing isn't bumped or we just don't recieve the event, we delete the old listing as it may have been deleted.
 // Backpack.tf may not have sent us the deleted event etc.
-const HARD_MAX_AGE_SECONDS = 24 * 60 * 60; // 24 hours
+const HARD_MAX_AGE_SECONDS = 48 * 60 * 60; // 24 hours
 
 const deleteOldListings = async () => {
     const stats = await db.any(`SELECT sku, moving_avg_count FROM listing_stats`);
-    for (const row of stats) {
-        let maxAge = HARD_MAX_AGE_SECONDS;
-        if (row.moving_avg_count > 20) maxAge = 2100; // 35 minutes for very active
-        else if (row.moving_avg_count > 5) maxAge = 6 * 3600; // 6h for moderately active
-        // else keep 24h for rare items
+    const veryActive = [];
+    const moderatelyActive = [];
+    const inActive = [];
+    const rare = [];
 
+    for (const row of stats) {
+        if (row.moving_avg_count > 20) veryActive.push(row.sku);
+        else if (row.moving_avg_count > 10) moderatelyActive.push(row.sku);
+        else if (row.moving_avg_count > 5) inActive.push(row.sku);
+        else rare.push(row.sku);
+    }
+
+    // Batch delete for very active (35 min)
+    if (veryActive.length > 0) {
         await db.none(
-            `DELETE FROM listings WHERE sku = $1 AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
-            [row.sku, maxAge]
+            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
+            [veryActive, 2100]
         );
     }
-    // Also, as a failsafe, delete any listing older than the hard max age
+    // Batch delete for moderately active (6h)
+    if (moderatelyActive.length > 0) {
+        await db.none(
+            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
+            [moderatelyActive, 6 * 3600]
+        );
+    }
+    // Batch delete for inActive (24h)
+    if (inActive.length > 0) {
+        await db.none(
+            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
+            [rare, 24 * 3600]
+        );
+    }
+    // Batch delete for rare (48h)
+    if (rare.length > 0) {
+        await db.none(
+            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
+            [rare, HARD_MAX_AGE_SECONDS]
+        );
+    }
+    // Failsafe: delete any listing older than the hard max age
     await db.none(
         `DELETE FROM listings WHERE EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $1`,
         [HARD_MAX_AGE_SECONDS]
