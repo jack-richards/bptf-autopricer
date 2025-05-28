@@ -113,8 +113,16 @@ function initBptfWebSocket({
     rws.addEventListener('message', event => {
         var json = JSON.parse(event.data);
         if (json instanceof Array) {
+            let updateCount = 0;
+            let deleteCount = 0;
+            json.forEach(ev => {
+                if (ev.event === 'listing-update') updateCount++;
+                else if (ev.event === 'listing-delete') deleteCount++;
+            });
+            console.log(`[WebSocket] Received batch: ${json.length} events (${updateCount} updates, ${deleteCount} deletions)`);
             json.forEach(handleEvent);
         } else {
+            console.log(`Received single bptf event`);
             handleEvent(json);
         }
     });
