@@ -1,5 +1,5 @@
-const ReconnectingWebSocket = require('reconnecting-websocket');
-const ws = require('ws');
+// This file is part of the BPTF Autopricer project.
+// It is a Node.js application that connects to Backpack.tf's WebSocket API,
 const fs = require('fs');
 const chokidar = require('chokidar');
 const methods = require('./methods');
@@ -40,8 +40,6 @@ const excludedListingDescriptions = config.excludedListingDescriptions;
 
 // Blocked attributes that we want to ignore. (Paints, parts, etc.)
 const blockedAttributes = config.blockedAttributes;
-
-const alwaysQuerySnapshotAPI = config.alwaysQuerySnapshotAPI;
 
 const fallbackOntoPricesTf = config.fallbackOntoPricesTf;
 
@@ -172,32 +170,15 @@ watcher.on('change', path => {
     loadNames();
 });
 
-const countListingsForItem = async (name) => {
-    try {
-        const result = await db.one(`
-            SELECT 
-                COUNT(*) FILTER (WHERE intent = 'sell') AS sell_count,
-                COUNT(*) FILTER (WHERE intent = 'buy') AS buy_count
-            FROM listings
-            WHERE name = $1;
-        `, [name]);
-
-        const { sell_count, buy_count } = result;
-        return sell_count >= 1 && buy_count >= 10;
-    } catch (error) {
-        console.error("Error counting listings", error);
-        throw error;
-    }
-};
-
 const calculateAndEmitPrices = async () => {
+    // Delete old listings from database.
+    await deleteOldListings();
+    // If the allowedItemNames is empty, we skip the pricing process.
     let item_objects = [];
     for (const name of allowedItemNames) {
         try {
             // Get sku of item via the item name.
             let sku = schemaManager.schema.getSkuFromName(name);
-            // Delete old listings from database.
-            await deleteOldListings();
             // Start process of pricing item.
             let arr = await determinePrice(name, sku);
             let item = finalisePrice(arr, name, sku);
