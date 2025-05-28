@@ -27,6 +27,11 @@ function initBptfWebSocket({
     });
 
     function handleEvent(e) {
+        if (!e.payload || !e.payload.item || !e.payload.item.name) {
+            // Optionally log ignored events for debugging:
+            console.log('[WebSocket] Ignored event:', e);
+            return;
+        }
         if (allowedItemNames.has(e.payload.item.name)) {
             let response_item = e.payload.item;
             let steamid = e.payload.steamid;

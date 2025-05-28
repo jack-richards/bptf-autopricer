@@ -261,6 +261,26 @@ const calculateAndEmitPrices = async () => {
     }
 };
 
+// Exponential moving average update
+async function updateMovingAverages(alpha = 0.2) {
+    const stats = await db.any(`SELECT sku, current_count, moving_avg_count FROM listing_stats`);
+    for (const row of stats) {
+        const prevAvg = row.moving_avg_count || row.current_count;
+        const newAvg = alpha * row.current_count + (1 - alpha) * prevAvg;
+        await db.none(
+            `UPDATE listing_stats SET moving_avg_count = $1, last_updated = NOW() WHERE sku = $2`,
+            [newAvg, row.sku]
+        );
+    }
+}
+
+async function initializeListingStats() {
+    const skus = await db.any(`SELECT DISTINCT sku FROM listings`);
+    for (const { sku } of skus) {
+        await updateListingStats(sku);
+    }
+}
+
 // When the schema manager is ready we proceed.
 schemaManager.init(async function(err) {
     if (err) {
@@ -281,7 +301,8 @@ schemaManager.init(async function(err) {
     //external_pricelist = await Methods.getExternalPricelist();
     // Calculate and emit prices on startup.
     await calculateAndEmitPrices();
-
+    // Call this once at startup if needed
+    await initializeListingStats();
     //InitialKeyPricingContinued
     await checkKeyPriceStability({
         db,
@@ -323,6 +344,9 @@ schemaManager.init(async function(err) {
             socketIO
         });
     }, 30 * 60 * 1000); // Check key price stability every 30 minutes
+
+    // Schedule every 15 minutes
+    setInterval(async () => { await updateMovingAverages() }, 15 * 60 * 1000);
 	
 	startPriceWatcher(); //start webpage for price watching 
 });
@@ -331,15 +355,31 @@ const getListings = async (name, intent) => {
     return await db.result(`SELECT * FROM listings WHERE name = $1 AND intent = $2`, [name, intent]);
 };
 
+// Helper to update stats after insert/delete
+async function updateListingStats(sku) {
+    // Get current count
+    const { count } = await db.one(
+        `SELECT COUNT(*) FROM listings WHERE sku = $1`, [sku]
+    );
+    // Update or insert stats row
+    await db.none(`
+        INSERT INTO listing_stats (sku, current_count, last_updated)
+        VALUES ($1, $2, NOW())
+        ON CONFLICT (sku) DO UPDATE SET current_count = $2, last_updated = NOW()
+    `, [sku, count]);
+}
+
 const insertListing = async (response_item, sku, currencies, intent, steamid) => {
     let timestamp = Math.floor(Date.now() / 1000);
-    return await db.none(
-        `INSERT INTO listings (name, sku, currencies, intent, updated, steamid)\
-         VALUES ($1, $2, $3, $4, $5, $6)\
-         ON CONFLICT (name, sku, intent, steamid)\
+    const result = await db.none(
+        `INSERT INTO listings (name, sku, currencies, intent, updated, steamid)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (name, sku, intent, steamid)
          DO UPDATE SET currencies = $3, updated = $5;`,
         [response_item.name, sku, JSON.stringify(currencies), intent, timestamp, steamid]
     );
+    await updateListingStats(sku);
+    return result;
 };
 
 const insertListings = async (unformattedListings, sku, name) => {
@@ -449,16 +489,39 @@ const insertListings = async (unformattedListings, sku, name) => {
 
 // Otherwise, if the listing isn't bumped or we just don't recieve the event, we delete the old listing as it may have been deleted.
 // Backpack.tf may not have sent us the deleted event etc.
+const HARD_MAX_AGE_SECONDS = 24 * 60 * 60; // 24 hours
+
 const deleteOldListings = async () => {
-    return await db.any(`DELETE FROM listings WHERE EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= 2100;`);
+    const stats = await db.any(`SELECT sku, moving_avg_count FROM listing_stats`);
+    for (const row of stats) {
+        let maxAge = HARD_MAX_AGE_SECONDS;
+        if (row.moving_avg_count > 20) maxAge = 2100; // 35 minutes for very active
+        else if (row.moving_avg_count > 5) maxAge = 6 * 3600; // 6h for moderately active
+        // else keep 24h for rare items
+
+        await db.none(
+            `DELETE FROM listings WHERE sku = $1 AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
+            [row.sku, maxAge]
+        );
+    }
+    // Also, as a failsafe, delete any listing older than the hard max age
+    await db.none(
+        `DELETE FROM listings WHERE EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $1`,
+        [HARD_MAX_AGE_SECONDS]
+    );
 };
 
 const deleteRemovedListing = async (steamid, name, intent) => {
-    return await db.any(`DELETE FROM listings WHERE steamid = $1 AND name = $2 AND intent = $3;`, [
-        steamid,
-        name,
-        intent
-    ]);
+    const sku = (await db.oneOrNone(
+        `SELECT sku FROM listings WHERE steamid = $1 AND name = $2 AND intent = $3 LIMIT 1`,
+        [steamid, name, intent]
+    ))?.sku;
+    const result = await db.any(
+        `DELETE FROM listings WHERE steamid = $1 AND name = $2 AND intent = $3;`,
+        [steamid, name, intent]
+    );
+    if (sku) await updateListingStats(sku);
+    return result;
 };
 
 const determinePrice = async (name, sku) => {
