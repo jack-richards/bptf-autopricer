@@ -20,6 +20,9 @@ const {
     adjustPrice,
     checkKeyPriceStability
 } = require('./modules/keyPriceUtils');
+const logDir = path.join(__dirname, 'logs');
+const logFile = path.join(logDir, 'websocket.log');
+if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
 
 const logDir = path.join(__dirname, 'logs');
 const logFile = path.join(logDir, 'websocket.log');
@@ -277,7 +280,7 @@ const calculateAndEmitPrices = async () => {
             Methods.addToPricelist(item, PRICELIST_PATH);
             // Instead of emitting item here, we store it in a array, so we can emit all items at once.
             // This allows us to control the speed at which we emit items to the client.
-            // Up to your own discretion whether this is neeeded or not.
+            // Up to your own discretion whether this is needed or not.
             item_objects.push(item);
         } catch (e) {
             console.log("Couldn't create a price for " + name);
@@ -724,8 +727,9 @@ const filterOutliers = listingsArray => {
     // trusted steamids (when applicable).
     var filteredMean = 0;
     for (var i = 0; i <= 2; i++) {
-        filteredMean = +Methods.toMetal(filteredListings[i].currencies, keyobj.metal);
+        filteredMean += +Methods.toMetal(filteredListings[i].currencies, keyobj.metal);
     }
+    filteredMean /= 3;
 
     // Validate the mean.
     if (!filteredMean || isNaN(filteredMean) || filteredMean === 0) {
