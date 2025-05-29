@@ -364,19 +364,23 @@ const insertListing = async (response_item, sku, currencies, intent, steamid) =>
 
 // Otherwise, if the listing isn't bumped or we just don't recieve the event, we delete the old listing as it may have been deleted.
 // Backpack.tf may not have sent us the deleted event etc.
-const HARD_MAX_AGE_SECONDS = 48 * 60 * 60; // 24 hours
+const HARD_MAX_AGE_SECONDS = 5 * 24 * 60 * 60; // 5 days
 
 const deleteOldListings = async () => {
     const stats = await db.any(`SELECT sku, moving_avg_count FROM listing_stats`);
     const veryActive = [];
+    const active = [];
     const moderatelyActive = [];
-    const inActive = [];
+    const somewhatActive = [];
+    const lowActive = [];
     const rare = [];
 
     for (const row of stats) {
-        if (row.moving_avg_count > 20) veryActive.push(row.sku);
+        if (row.moving_avg_count > 18) veryActive.push(row.sku);
+        else if (row.moving_avg_count > 14) active.push(row.sku);
         else if (row.moving_avg_count > 10) moderatelyActive.push(row.sku);
-        else if (row.moving_avg_count > 5) inActive.push(row.sku);
+        else if (row.moving_avg_count > 5) somewhatActive.push(row.sku);
+        else if (row.moving_avg_count > 3) lowActive.push(row.sku);
         else rare.push(row.sku);
     }
 
@@ -384,7 +388,14 @@ const deleteOldListings = async () => {
     if (veryActive.length > 0) {
         await db.none(
             `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
-            [veryActive, 2100]
+            [veryActive, 35 * 60]
+        );
+    }
+    // Batch delete for active (2h)
+    if (active.length > 0) {
+        await db.none(
+            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
+            [active, 2 * 3600]
         );
     }
     // Batch delete for moderately active (6h)
@@ -394,14 +405,21 @@ const deleteOldListings = async () => {
             [moderatelyActive, 6 * 3600]
         );
     }
-    // Batch delete for inActive (24h)
-    if (inActive.length > 0) {
+    // Batch delete for somewhat active (24h)
+    if (somewhatActive.length > 0) {
         await db.none(
             `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
-            [inActive, 24 * 3600]
+            [somewhatActive, 24 * 3600]
         );
     }
-    // Batch delete for rare (48h)
+    // Batch delete for low active (3d)
+    if (lowActive.length > 0) {
+        await db.none(
+            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
+            [lowActive, 3 * 24 * 3600]
+        );
+    }
+    // Batch delete for rare (5d)
     if (rare.length > 0) {
         await db.none(
             `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
