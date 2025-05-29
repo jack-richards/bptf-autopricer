@@ -221,7 +221,10 @@ const calculateAndEmitPrices = async () => {
 };
 
 // Exponential moving average update
-async function updateMovingAverages(alpha = 0.2) {
+async function updateMovingAverages(alpha = 0.35) { // Set to 0.3 for faster adaptation
+    if (alpha <= 0 || alpha > 1) {
+        throw new Error('Alpha must be between 0 (exclusive) and 1 (inclusive).');
+    }
     const stats = await db.any(`SELECT sku, current_count, moving_avg_count FROM listing_stats`);
     if (stats.length === 0) return;
 
@@ -245,14 +248,14 @@ async function updateMovingAverages(alpha = 0.2) {
         FROM (VALUES ${values}) AS tmp(sku, moving_avg_count)
         WHERE ls.sku = tmp.sku
     `);
-}
 
-// Initialize listing stats for all SKUs in the database.
-async function initializeListingStats() {
-    const skus = await db.any(`SELECT DISTINCT sku FROM listings`);
-    for (const { sku } of skus) {
-        await updateListingStats(sku);
-    }
+    // Fetch and log updated rows for validation
+    const updatedSkus = updates.map(u => u.sku);
+    const updatedRows = await db.any(
+        `SELECT sku, moving_avg_count FROM listing_stats WHERE sku IN ($1:csv) ORDER BY sku`,
+        [updatedSkus]
+    );
+    console.log('Updated moving averages:', updatedRows);
 }
 
 // When the schema manager is ready we proceed.
