@@ -17,3 +17,9 @@ CREATE TABLE tf2.key_prices (
     timestamp INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE tf2.listing_stats (
+    sku TEXT PRIMARY KEY,
+    current_count INTEGER DEFAULT 0,
+    moving_avg_count REAL DEFAULT 0,
+    last_updated TIMESTAMP DEFAULT NOW()
+);

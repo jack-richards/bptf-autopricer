@@ -10,7 +10,7 @@ module.exports = (app, config) => {
       const data = await db.any(`
         SELECT timestamp, buy_price_metal, sell_price_metal
         FROM key_prices
-        WHERE created_at > NOW() - INTERVAL '3 days'
+        WHERE created_at > NOW() - INTERVAL '14 days'
         ORDER BY created_at ASC
       `);
 
@@ -35,9 +35,9 @@ module.exports = (app, config) => {
         }
       };
 
-      res.send(renderPage('Key Prices (Last 3 Days)',`
+      res.send(renderPage('Key Prices (Last 14 Days)',`
         <body>
-          <h1>Key Prices (Last 3 Days)</h1>
+          <h1>Key Prices (Last 14 Days)</h1>
           <canvas id="priceChart" width="1000" height="400"></canvas>
           <p><strong>Buy Price Mean:</strong> ${stats.buy.mean}, <strong>Std Dev:</strong> ${stats.buy.std}</p>
           <p><strong>Sell Price Mean:</strong> ${stats.sell.mean}, <strong>Std Dev:</strong> ${stats.sell.std}</p>

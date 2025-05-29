@@ -1,5 +1,5 @@
-const ReconnectingWebSocket = require('reconnecting-websocket');
-const ws = require('ws');
+// This file is part of the BPTF Autopricer project.
+// It is a Node.js application that connects to Backpack.tf's WebSocket API,
 const fs = require('fs');
 const chokidar = require('chokidar');
 const methods = require('./methods');
@@ -40,8 +40,6 @@ const excludedListingDescriptions = config.excludedListingDescriptions;
 
 // Blocked attributes that we want to ignore. (Paints, parts, etc.)
 const blockedAttributes = config.blockedAttributes;
-
-const alwaysQuerySnapshotAPI = config.alwaysQuerySnapshotAPI;
 
 const fallbackOntoPricesTf = config.fallbackOntoPricesTf;
 
@@ -145,12 +143,7 @@ const updateKeyObject = async () => {
   socketIO.emit('price', key_item);
 };
 
-const rws = new ReconnectingWebSocket('wss://ws.backpack.tf/events/', undefined, {
-    WebSocket: ws,
-    headers: {
-        'batch-test': true
-    }
-});
+const { initBptfWebSocket } = require('./websocket/bptfWebSocket');
 
 let allowedItemNames = new Set();
 
@@ -177,79 +170,15 @@ watcher.on('change', path => {
     loadNames();
 });
 
-function logWebSocketEvent(message) {
-    const timestamp = new Date().toISOString();
-    fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`);
-}
-
-rws.addEventListener('open', event => {
-    const msg = 'Connected to socket.';
-    console.log(msg);
-    logWebSocketEvent(msg);
-});
-
-rws.addEventListener('close', event => {
-    const msg = `WebSocket connection closed. ${event.reason || ''}`;
-    console.warn(msg);
-    logWebSocketEvent(msg);
-});
-
-rws.addEventListener('error', event => {
-    const msg = `WebSocket encountered an error: ${event.message || event}`;
-    console.error(msg);
-    logWebSocketEvent(msg);
-});
-
-const countListingsForItem = async (name) => {
-    try {
-        const result = await db.one(`
-            SELECT 
-                COUNT(*) FILTER (WHERE intent = 'sell') AS sell_count,
-                COUNT(*) FILTER (WHERE intent = 'buy') AS buy_count
-            FROM listings
-            WHERE name = $1;
-        `, [name]);
-
-        const { sell_count, buy_count } = result;
-        return sell_count >= 1 && buy_count >= 10;
-    } catch (error) {
-        console.error("Error counting listings", error);
-        throw error;
-    }
-};
-
-const updateFromSnapshot = async (name, sku) => {
-    // Check if always call snapshot API setting is enabled.
-    if (!alwaysQuerySnapshotAPI) {
-        // Check if required number of listings already exist in database for item.
-        // If not we need to query the snapshots API.
-        let callSnapshot = await countListingsForItem(name);
-        if(callSnapshot) {
-            // Get listings from snapshot API.
-            let unformatedListings = await Methods.getListingsFromSnapshots(name);
-            // Insert snapshot listings.
-            await insertListings(unformatedListings, sku, name);
-        }
-    } else {
-        // Get listings from snapshot API.
-        let unformatedListings = await Methods.getListingsFromSnapshots(name);
-        // Insert snapshot listings.
-        await insertListings(unformatedListings, sku, name);
-    }
-}
-
-
-
 const calculateAndEmitPrices = async () => {
+    // Delete old listings from database.
+    await deleteOldListings();
+    // If the allowedItemNames is empty, we skip the pricing process.
     let item_objects = [];
     for (const name of allowedItemNames) {
         try {
             // Get sku of item via the item name.
             let sku = schemaManager.schema.getSkuFromName(name);
-            // Delete old listings from database.
-            await deleteOldListings();
-            // Use snapshot API to populate database with listings for item.
-            await updateFromSnapshot(name, sku);
             // Start process of pricing item.
             let arr = await determinePrice(name, sku);
             let item = finalisePrice(arr, name, sku);
@@ -260,7 +189,7 @@ const calculateAndEmitPrices = async () => {
             // If item is priced at 0, we skip it. Autobot cache of the prices.tf pricelist can sometimes have items set as such.
             if (item.buy.keys === 0 && item.buy.metal === 0 ||
                 item.sell.keys === 0 && item.sell.metal === 0) {
-                    throw new Error("Autobot cache of prices.tf pricelist has marked item with price of 0.", e);
+                    throw new Error("Autobot cache of prices.tf pricelist has marked item with price of 0.");
             }
 
             // If it's a key (sku 5021;6), insert the price into the key_prices table
@@ -291,87 +220,61 @@ const calculateAndEmitPrices = async () => {
     }
 };
 
-function handleEvent(e) {
-    // Only process relevant events.
-    if (allowedItemNames.has(e.payload.item.name)) {
-        let response_item = e.payload.item;
-        let steamid = e.payload.steamid;
-        let intent = e.payload.intent;
-        switch (e.event) {
-            case 'listing-update':
-                let currencies = e.payload.currencies;
-                let listingDetails = e.payload.details;
-                let listingItemObject = e.payload.item; // The item object where paint and stuff is stored.
+// Exponential moving average update
+async function updateMovingAverages(alpha = 0.35) {
+    if (alpha <= 0 || alpha > 1) {
+        throw new Error('Alpha must be between 0 (exclusive) and 1 (inclusive).');
+    }
+    const stats = await db.any(`SELECT sku, current_count, moving_avg_count FROM listing_stats`);
+    if (stats.length === 0) return;
 
-                // If userAgent field is not present, return.
-                // This indicates that the listing was not created by a bot.
-                if (!e.payload.userAgent) {
-                    return;
-                }
+    // Prepare batch update data, only if value changes
+    const updates = stats.map(row => {
+        const prevAvg = row.moving_avg_count ?? row.current_count;
+        const newAvg = alpha * row.current_count + (1 - alpha) * prevAvg;
+        return {
+            sku: row.sku,
+            moving_avg_count: newAvg
+        };
+    }).filter(u => {
+        // Only update if value actually changes (optional)
+        const orig = stats.find(r => r.sku === u.sku);
+        return Math.abs((orig.moving_avg_count ?? orig.current_count) - u.moving_avg_count) > 1e-6;
+    });
 
-                // Make sure currencies object contains at least one key related to metal or keys.
-                if (!Methods.validateObject(currencies)) {
-                    return;
-                }
+    if (updates.length === 0) {
+        console.log('No moving averages changed.');
+        return;
+    }
 
-                // Filter out painted items.
-                if (listingItemObject.attributes && listingItemObject.attributes.some(attribute => {
-                    return typeof attribute === 'object' && // Ensure the attribute is an object.
-                        attribute.float_value &&  // Ensure the attribute has a float_value.
-                        // Check if the float_value is in the blockedAttributes object.
-                        Object.values(blockedAttributes).map(String).includes(String(attribute.float_value)) &&
-                        // Ensure the name of the item doesn't include any of the keys in the blockedAttributes object.
-                        !Object.keys(blockedAttributes).some(key => name.includes(key));
-                })) {
-                    return;  // Skip this listing. Listing is for a painted item.
-                }
+    const cs = new pgp.helpers.ColumnSet(['sku', 'moving_avg_count'], { table: 'tmp' });
+    const values = pgp.helpers.values(updates, cs);
 
-                // Create a currencies object that contains only metal and keys.
-                currencies = Methods.createCurrencyObject(currencies);
+    try {
+        await db.none(`
+            UPDATE listing_stats AS ls
+            SET moving_avg_count = tmp.moving_avg_count, last_updated = NOW()
+            FROM (VALUES ${values}) AS tmp(sku, moving_avg_count)
+            WHERE ls.sku = tmp.sku
+        `);
 
-                // Filter out listing if it's owned by blacklisted ID.
-                if (!excludedSteamIds.some(id => steamid === id)) {
-                    // Perform further filtering to ignore listing if it mentions spells in it's description.
-                    // Prices tend to be significantly different for spelled items.
-                    // Splits description up into whole words, meaning if "Ex" is a blocked description term then
-                    // the word "Explosion" will not cause a false positive.
-                    if (
-                        listingDetails && 
-                        !excludedListingDescriptions.some(detail =>
-                            new RegExp(`\\b${detail}\\b`, 'i').test(
-                                listingDetails.normalize('NFKD').toLowerCase().trim()
-                            )
-                        )
-                    )
-                    {
-                        try {
-                            // Generate SKU from name. Found out that a perfect version of this method was already
-                            // created by the developers who worked on tf2autobot. I believe they forked Nicklasons
-                            // original module and then added a bunch more features.
-                            var sku = schemaManager.schema.getSkuFromName(response_item.name);
-                            if (sku === null || sku === undefined) {
-                                throw new Error(
-                                    `| UPDATING PRICES |: Couldn't price ${response_item.name}. Issue with retrieving this items defindex.`
-                                );
-                            }
-                            insertListing(response_item, sku, currencies, intent, steamid);
-                        } catch (e) {
-                            console.log(e);
-                            console.log("Couldn't create a price for " + response_item.name);
-                        }
-                    }
-                }
-                break;
-            case 'listing-delete':
-                try {
-                    // Removes the listing that has been deleted from backpack.tf from our database.
-                    deleteRemovedListing(steamid, response_item.name, intent);
-                } catch (e) {
-                    // console.log(e);
-                    return;
-                }
-                break;
-        }
+        // Fetch and log updated rows for validation
+        const updatedSkus = updates.map(u => u.sku);
+        const updatedRows = await db.any(
+            `SELECT sku, moving_avg_count FROM listing_stats WHERE sku IN ($1:csv) ORDER BY sku`,
+            [updatedSkus]
+        );
+        console.log('Updated moving averages:', updatedRows);
+    } catch (err) {
+        console.error('Error updating moving averages:', err);
+    }
+}
+
+// Initialize listing stats for all SKUs in the database.
+async function initializeListingStats() {
+    const skus = await db.any(`SELECT DISTINCT sku FROM listings`);
+    for (const { sku } of skus) {
+        await updateListingStats(sku);
     }
 }
 
@@ -395,7 +298,8 @@ schemaManager.init(async function(err) {
     //external_pricelist = await Methods.getExternalPricelist();
     // Calculate and emit prices on startup.
     await calculateAndEmitPrices();
-
+    // Call this once at startup if needed
+    await initializeListingStats();
     //InitialKeyPricingContinued
     await checkKeyPriceStability({
         db,
@@ -405,17 +309,6 @@ schemaManager.init(async function(err) {
         sendPriceAlert,
         PRICELIST_PATH,
         socketIO
-    });
-
-    // Listen for events from the bptf socket.
-    rws.addEventListener('message', event => {
-        var json = JSON.parse(event.data);
-        // forwards-compatible support of the batch mode, if you did not set the batch-test header.
-        if (json instanceof Array) {
-            json.forEach(handleEvent); // handles the new event format
-        } else {
-            handleEvent(json); // old event-per-frame message format - DEPRECATED!
-        }
     });
     
     // Set-up timers for updating key-object, external pricelist and creating prices from listing data.
@@ -448,6 +341,9 @@ schemaManager.init(async function(err) {
             socketIO
         });
     }, 30 * 60 * 1000); // Check key price stability every 30 minutes
+
+    // Schedule every 15 minutes
+    setInterval(async () => { await updateMovingAverages() }, 15 * 60 * 1000);
 	
 	startPriceWatcher(); //start webpage for price watching 
 });
@@ -456,114 +352,31 @@ const getListings = async (name, intent) => {
     return await db.result(`SELECT * FROM listings WHERE name = $1 AND intent = $2`, [name, intent]);
 };
 
+// Helper to update stats after insert/delete
+async function updateListingStats(sku) {
+    // Get current count
+    const { count } = await db.one(
+        `SELECT COUNT(*) FROM listings WHERE sku = $1`, [sku]
+    );
+    // Update or insert stats row
+    await db.none(`
+        INSERT INTO listing_stats (sku, current_count, last_updated)
+        VALUES ($1, $2, NOW())
+        ON CONFLICT (sku) DO UPDATE SET current_count = $2, last_updated = NOW()
+    `, [sku, count]);
+}
+
 const insertListing = async (response_item, sku, currencies, intent, steamid) => {
     let timestamp = Math.floor(Date.now() / 1000);
-    return await db.none(
-        `INSERT INTO listings (name, sku, currencies, intent, updated, steamid)\
-         VALUES ($1, $2, $3, $4, $5, $6)\
-         ON CONFLICT (name, sku, intent, steamid)\
+    const result = await db.none(
+        `INSERT INTO listings (name, sku, currencies, intent, updated, steamid)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (name, sku, intent, steamid)
          DO UPDATE SET currencies = $3, updated = $5;`,
         [response_item.name, sku, JSON.stringify(currencies), intent, timestamp, steamid]
     );
-};
-
-const insertListings = async (unformattedListings, sku, name) => {
-    // If there are no listings from the snapshot just return. No update can be done.
-    if (!unformattedListings) {
-        throw new Error(`No listings found for ${name} in the snapshot. The name: '${name}' likely doesn't match the version on the items bptf listings page.`);
-    }
-    try {
-        let formattedListings = [];
-        const uniqueSet = new Set(); // Create a set to store unique combinations
-
-        // Calculate timestamp once, no point doing it for each iteration.
-        // We take 60 seconds from the timestamp as snapshots results can be up to a minute old.
-        // This allows us to essentially prioritise keeping the listings in the database that
-        // were added by the websocket. As we know they are the most up-to-date.
-        let updated = Math.floor(Date.now() / 1000) - 60;
-
-        for (const listing of unformattedListings) {
-            if (
-                listing.details && 
-                excludedListingDescriptions.some(detail =>
-                    new RegExp(`\\b${detail}\\b`, 'i').test(
-                        listing.details.normalize('NFKD').toLowerCase().trim()
-                    )
-                )
-            ) {
-                // Skip this listing. Listing is for a spelled item.
-                continue;
-            }
-
-            // The item object where paint and stuff is stored.
-            const listingItemObject = listing.item;
-
-            // Filter out painted items.
-            if (listingItemObject.attributes && listingItemObject.attributes.some(attribute => {
-                return typeof attribute === 'object' && // Ensure the attribute is an object.
-                    attribute.float_value &&  // Ensure the attribute has a float_value.
-                    // Check if the float_value is in the blockedAttributes object.
-                    Object.values(blockedAttributes).map(String).includes(String(attribute.float_value)) &&
-                    // Ensure the name of the item doesn't include any of the keys in the blockedAttributes object.
-                    !Object.keys(blockedAttributes).some(key => name.includes(key));
-            })) {
-                continue;  // Skip this listing. Listing is for a painted item.
-            }
-
-            // If userAgent field is not present, continue.
-            // This indicates that the listing was not created by a bot.
-            if (!listing.userAgent) {
-                continue;
-            }
-
-            // Create a unique key for each listing comprised
-            // of each key of the composite primary key.
-            const uniqueKey = `${listing.steamid}-${name}-${sku}-${listing.intent}`;
-            // Check if this combination is already in the uniqueSet
-            if (uniqueSet.has(uniqueKey)) {
-                // Duplicate entry, skip this listing.
-                continue;
-            }
-            // Add the unique combination to the set
-            uniqueSet.add(uniqueKey);
-
-            let formattedListing = {};
-            // We set name to what we know it should be.
-            formattedListing.name = name;
-            // We set the sku to what we generated.
-            formattedListing.sku = sku;
-            let currenciesValid = Methods.validateObject(listing.currencies);
-            // If currencies is invalid.
-            if (!currenciesValid) {
-                // Skip this listing.
-                continue;
-            }
-            let validatedCurrencies = Methods.createCurrencyObject(listing.currencies);
-            formattedListing.currencies = JSON.stringify(validatedCurrencies);
-            formattedListing.intent = listing.intent;
-            formattedListing.updated = updated;
-            formattedListing.steamid = listing.steamid;
-
-            formattedListings.push(formattedListing);
-        }
-
-        if (formattedListings.length > 0) {
-            // Bulk insert rows into the table using pg-promise module.
-            // I only update the listings if the updated timestamp is greater than the current one.
-            // We do this to ensure that we don't overwrite a newer listing with an older one.
-            const query =
-                pgp.helpers.insert(formattedListings, cs, 'listings') +
-                ` ON CONFLICT (name, sku, intent, steamid)\
-                DO UPDATE SET currencies = excluded.currencies, updated = excluded.updated\
-                WHERE excluded.updated > listings.updated;`;
-
-            await db.none(query);
-        }
-        return;
-    } catch (e) {
-        console.log(e);
-        throw e;
-    }
+    await updateListingStats(sku);
+    return result;
 };
 
 // Arguably quite in-efficient but I don't see a good alternative at the moment.
@@ -574,16 +387,86 @@ const insertListings = async (unformattedListings, sku, name) => {
 
 // Otherwise, if the listing isn't bumped or we just don't recieve the event, we delete the old listing as it may have been deleted.
 // Backpack.tf may not have sent us the deleted event etc.
+const HARD_MAX_AGE_SECONDS = 5 * 24 * 60 * 60; // 5 days
+
 const deleteOldListings = async () => {
-    return await db.any(`DELETE FROM listings WHERE EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= 2100;`);
+    const stats = await db.any(`SELECT sku, moving_avg_count FROM listing_stats`);
+    const veryActive = [];
+    const active = [];
+    const moderatelyActive = [];
+    const somewhatActive = [];
+    const lowActive = [];
+    const rare = [];
+
+    for (const row of stats) {
+        if (row.moving_avg_count > 18) veryActive.push(row.sku);
+        else if (row.moving_avg_count > 14) active.push(row.sku);
+        else if (row.moving_avg_count > 10) moderatelyActive.push(row.sku);
+        else if (row.moving_avg_count > 5) somewhatActive.push(row.sku);
+        else if (row.moving_avg_count > 3) lowActive.push(row.sku);
+        else rare.push(row.sku);
+    }
+
+    // Batch delete for very active (35 min)
+    if (veryActive.length > 0) {
+        await db.none(
+            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
+            [veryActive, 35 * 60]
+        );
+    }
+    // Batch delete for active (2h)
+    if (active.length > 0) {
+        await db.none(
+            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
+            [active, 2 * 3600]
+        );
+    }
+    // Batch delete for moderately active (6h)
+    if (moderatelyActive.length > 0) {
+        await db.none(
+            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
+            [moderatelyActive, 6 * 3600]
+        );
+    }
+    // Batch delete for somewhat active (24h)
+    if (somewhatActive.length > 0) {
+        await db.none(
+            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
+            [somewhatActive, 24 * 3600]
+        );
+    }
+    // Batch delete for low active (3d)
+    if (lowActive.length > 0) {
+        await db.none(
+            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
+            [lowActive, 3 * 24 * 3600]
+        );
+    }
+    // Batch delete for rare (5d)
+    if (rare.length > 0) {
+        await db.none(
+            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
+            [rare, HARD_MAX_AGE_SECONDS]
+        );
+    }
+    // Failsafe: delete any listing older than the hard max age
+    await db.none(
+        `DELETE FROM listings WHERE EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $1`,
+        [HARD_MAX_AGE_SECONDS]
+    );
 };
 
 const deleteRemovedListing = async (steamid, name, intent) => {
-    return await db.any(`DELETE FROM listings WHERE steamid = $1 AND name = $2 AND intent = $3;`, [
-        steamid,
-        name,
-        intent
-    ]);
+    const sku = (await db.oneOrNone(
+        `SELECT sku FROM listings WHERE steamid = $1 AND name = $2 AND intent = $3 LIMIT 1`,
+        [steamid, name, intent]
+    ))?.sku;
+    const result = await db.any(
+        `DELETE FROM listings WHERE steamid = $1 AND name = $2 AND intent = $3;`,
+        [steamid, name, intent]
+    );
+    if (sku) await updateListingStats(sku);
+    return result;
 };
 
 const determinePrice = async (name, sku) => {
@@ -865,9 +748,9 @@ const finalisePrice = (arr, name, sku) => {
 
             // We are taking the buy array price as a whole, and also passing in the current selling price
             // for a key into the parsePrice method.
-            arr[0] = Methods.parsePrice(arr[0], keyobj.metal);
             // We are taking the sell array price as a whole, and also passing in the current selling price
             // for a key into the parsePrice method.
+            arr[0] = Methods.parsePrice(arr[0], keyobj.metal);
             arr[1] = Methods.parsePrice(arr[1], keyobj.metal);
 
             // Calculates the pure value of the keys involved and adds it to the pure metal.
@@ -911,6 +794,19 @@ const finalisePrice = (arr, name, sku) => {
         return;
     }
 };
+
+// Initialize the websocket and pass in dependencies
+const rws = initBptfWebSocket({
+    allowedItemNames,
+    schemaManager,
+    Methods,
+    insertListing,
+    deleteRemovedListing,
+    excludedSteamIds,
+    excludedListingDescriptions,
+    blockedAttributes,
+    logFile
+});
 
 listen();
 

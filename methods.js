@@ -239,7 +239,7 @@ Methods.prototype.addToPricelist = function(item, PRICELIST_PATH) {
 };
 
 // Request related methods.
-
+// This method is now deprecated on Backpack.tf and will not work.
 Methods.prototype.getListingsFromSnapshots = async function(name) {
     try {
         // Endpoint is limited to 1 request per 60 seconds.
