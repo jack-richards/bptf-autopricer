@@ -221,41 +221,53 @@ const calculateAndEmitPrices = async () => {
 };
 
 // Exponential moving average update
-async function updateMovingAverages(alpha = 0.35) { // Set to 0.3 for faster adaptation
+async function updateMovingAverages(alpha = 0.35) {
     if (alpha <= 0 || alpha > 1) {
         throw new Error('Alpha must be between 0 (exclusive) and 1 (inclusive).');
     }
     const stats = await db.any(`SELECT sku, current_count, moving_avg_count FROM listing_stats`);
     if (stats.length === 0) return;
 
-    // Prepare batch update data
+    // Prepare batch update data, only if value changes
     const updates = stats.map(row => {
-        const prevAvg = row.moving_avg_count || row.current_count;
+        const prevAvg = row.moving_avg_count ?? row.current_count;
         const newAvg = alpha * row.current_count + (1 - alpha) * prevAvg;
         return {
             sku: row.sku,
             moving_avg_count: newAvg
         };
+    }).filter(u => {
+        // Only update if value actually changes (optional)
+        const orig = stats.find(r => r.sku === u.sku);
+        return Math.abs((orig.moving_avg_count ?? orig.current_count) - u.moving_avg_count) > 1e-6;
     });
 
-    // Batch update using VALUES and JOIN
+    if (updates.length === 0) {
+        console.log('No moving averages changed.');
+        return;
+    }
+
     const cs = new pgp.helpers.ColumnSet(['sku', 'moving_avg_count'], { table: 'tmp' });
     const values = pgp.helpers.values(updates, cs);
 
-    await db.none(`
-        UPDATE listing_stats AS ls
-        SET moving_avg_count = tmp.moving_avg_count, last_updated = NOW()
-        FROM (VALUES ${values}) AS tmp(sku, moving_avg_count)
-        WHERE ls.sku = tmp.sku
-    `);
+    try {
+        await db.none(`
+            UPDATE listing_stats AS ls
+            SET moving_avg_count = tmp.moving_avg_count, last_updated = NOW()
+            FROM (VALUES ${values}) AS tmp(sku, moving_avg_count)
+            WHERE ls.sku = tmp.sku
+        `);
 
-    // Fetch and log updated rows for validation
-    const updatedSkus = updates.map(u => u.sku);
-    const updatedRows = await db.any(
-        `SELECT sku, moving_avg_count FROM listing_stats WHERE sku IN ($1:csv) ORDER BY sku`,
-        [updatedSkus]
-    );
-    console.log('Updated moving averages:', updatedRows);
+        // Fetch and log updated rows for validation
+        const updatedSkus = updates.map(u => u.sku);
+        const updatedRows = await db.any(
+            `SELECT sku, moving_avg_count FROM listing_stats WHERE sku IN ($1:csv) ORDER BY sku`,
+            [updatedSkus]
+        );
+        console.log('Updated moving averages:', updatedRows);
+    } catch (err) {
+        console.error('Error updating moving averages:', err);
+    }
 }
 
 // When the schema manager is ready we proceed.
