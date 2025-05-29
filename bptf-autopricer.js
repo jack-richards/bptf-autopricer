@@ -20,6 +20,11 @@ const {
     adjustPrice,
     checkKeyPriceStability
 } = require('./modules/keyPriceUtils');
+const {
+    updateMovingAverages,
+    updateListingStats,
+    initializeListingStats
+} = require('./modules/listingAverages');
 const logDir = path.join(__dirname, 'logs');
 const logFile = path.join(logDir, 'websocket.log');
 if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
@@ -220,84 +225,6 @@ const calculateAndEmitPrices = async () => {
     }
 };
 
-// Exponential moving average update
-async function updateMovingAverages(alpha = 0.35) {
-    if (alpha <= 0 || alpha > 1) {
-        throw new Error('Alpha must be between 0 (exclusive) and 1 (inclusive).');
-    }
-    const stats = await db.any(`
-        SELECT sku, current_count, moving_avg_count,
-               current_buy_count, moving_avg_buy_count,
-               current_sell_count, moving_avg_sell_count
-        FROM listing_stats
-    `);
-    if (stats.length === 0) return;
-
-    // Prepare batch update data, only if value changes
-    const updates = stats.map(row => {
-        const prevAvg = row.moving_avg_count ?? row.current_count;
-        const prevBuyAvg = row.moving_avg_buy_count ?? row.current_buy_count;
-        const prevSellAvg = row.moving_avg_sell_count ?? row.current_sell_count;
-        const newAvg = alpha * row.current_count + (1 - alpha) * prevAvg;
-        const newBuyAvg = alpha * row.current_buy_count + (1 - alpha) * prevBuyAvg;
-        const newSellAvg = alpha * row.current_sell_count + (1 - alpha) * prevSellAvg;
-        return {
-            sku: row.sku,
-            moving_avg_count: newAvg,
-            moving_avg_buy_count: newBuyAvg,
-            moving_avg_sell_count: newSellAvg
-        };
-    }).filter(u => {
-        const orig = stats.find(r => r.sku === u.sku);
-        return (
-            Math.abs((orig.moving_avg_count ?? orig.current_count) - u.moving_avg_count) > 1e-6 ||
-            Math.abs((orig.moving_avg_buy_count ?? orig.current_buy_count) - u.moving_avg_buy_count) > 1e-6 ||
-            Math.abs((orig.moving_avg_sell_count ?? orig.current_sell_count) - u.moving_avg_sell_count) > 1e-6
-        );
-    });
-
-    if (updates.length === 0) {
-        console.log('No moving averages changed.');
-        return;
-    }
-
-    const cs = new pgp.helpers.ColumnSet(
-        ['sku', 'moving_avg_count', 'moving_avg_buy_count', 'moving_avg_sell_count'],
-        { table: 'tmp' }
-    );
-    const values = pgp.helpers.values(updates, cs);
-
-    try {
-        await db.none(`
-            UPDATE listing_stats AS ls
-            SET moving_avg_count = tmp.moving_avg_count,
-                moving_avg_buy_count = tmp.moving_avg_buy_count,
-                moving_avg_sell_count = tmp.moving_avg_sell_count,
-                last_updated = NOW()
-            FROM (VALUES ${values}) AS tmp(sku, moving_avg_count, moving_avg_buy_count, moving_avg_sell_count)
-            WHERE ls.sku = tmp.sku
-        `);
-
-        // Fetch and log updated rows for validation
-        const updatedSkus = updates.map(u => u.sku);
-        const updatedRows = await db.any(
-            `SELECT sku, moving_avg_count, moving_avg_buy_count, moving_avg_sell_count FROM listing_stats WHERE sku IN ($1:csv) ORDER BY sku`,
-            [updatedSkus]
-        );
-        console.log('Updated moving averages:', updatedRows);
-    } catch (err) {
-        console.error('Error updating moving averages:', err);
-    }
-}
-
-// Initialize listing stats for all SKUs in the database.
-async function initializeListingStats() {
-    const skus = await db.any(`SELECT DISTINCT sku FROM listings`);
-    for (const { sku } of skus) {
-        await updateListingStats(sku);
-    }
-}
-
 // When the schema manager is ready we proceed.
 schemaManager.init(async function(err) {
     if (err) {
@@ -319,7 +246,7 @@ schemaManager.init(async function(err) {
     // Calculate and emit prices on startup.
     await calculateAndEmitPrices();
     // Call this once at startup if needed
-    await initializeListingStats();
+    await initializeListingStats(db);
     //InitialKeyPricingContinued
     await checkKeyPriceStability({
         db,
@@ -363,7 +290,7 @@ schemaManager.init(async function(err) {
     }, 30 * 60 * 1000); // Check key price stability every 30 minutes
 
     // Schedule every 15 minutes
-    setInterval(async () => { await updateMovingAverages() }, 15 * 60 * 1000);
+    setInterval(async () => { await updateMovingAverages(db, pgp); }, 15 * 60 * 1000);
 	
 	startPriceWatcher(); //start webpage for price watching 
 });
@@ -371,30 +298,6 @@ schemaManager.init(async function(err) {
 const getListings = async (name, intent) => {
     return await db.result(`SELECT * FROM listings WHERE name = $1 AND intent = $2`, [name, intent]);
 };
-
-// Helper to update stats after insert/delete
-async function updateListingStats(sku) {
-    // Get overall, buy, and sell counts
-    const { count: overallCount } = await db.one(
-        `SELECT COUNT(*) FROM listings WHERE sku = $1`, [sku]
-    );
-    const { count: buyCount } = await db.one(
-        `SELECT COUNT(*) FROM listings WHERE sku = $1 AND intent = 'buy'`, [sku]
-    );
-    const { count: sellCount } = await db.one(
-        `SELECT COUNT(*) FROM listings WHERE sku = $1 AND intent = 'sell'`, [sku]
-    );
-    // Update or insert stats row
-    await db.none(`
-        INSERT INTO listing_stats (sku, current_count, current_buy_count, current_sell_count, last_updated)
-        VALUES ($1, $2, $3, $4, NOW())
-        ON CONFLICT (sku) DO UPDATE SET
-            current_count = $2,
-            current_buy_count = $3,
-            current_sell_count = $4,
-            last_updated = NOW()
-    `, [sku, overallCount, buyCount, sellCount]);
-}
 
 const insertListing = async (response_item, sku, currencies, intent, steamid) => {
     let timestamp = Math.floor(Date.now() / 1000);
@@ -405,7 +308,7 @@ const insertListing = async (response_item, sku, currencies, intent, steamid) =>
          DO UPDATE SET currencies = $3, updated = $5;`,
         [response_item.name, sku, JSON.stringify(currencies), intent, timestamp, steamid]
     );
-    await updateListingStats(sku);
+    await updateListingStats(db, sku);
     return result;
 };
 
@@ -494,7 +397,7 @@ const deleteRemovedListing = async (steamid, name, intent) => {
         `DELETE FROM listings WHERE steamid = $1 AND name = $2 AND intent = $3;`,
         [steamid, name, intent]
     );
-    if (sku) await updateListingStats(sku);
+    if (sku) await updateListingStats(db, sku);
     return result;
 };
 
