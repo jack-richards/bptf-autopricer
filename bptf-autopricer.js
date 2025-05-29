@@ -225,21 +225,35 @@ async function updateMovingAverages(alpha = 0.35) {
     if (alpha <= 0 || alpha > 1) {
         throw new Error('Alpha must be between 0 (exclusive) and 1 (inclusive).');
     }
-    const stats = await db.any(`SELECT sku, current_count, moving_avg_count FROM listing_stats`);
+    const stats = await db.any(`
+        SELECT sku, current_count, moving_avg_count,
+               current_buy_count, moving_avg_buy_count,
+               current_sell_count, moving_avg_sell_count
+        FROM listing_stats
+    `);
     if (stats.length === 0) return;
 
     // Prepare batch update data, only if value changes
     const updates = stats.map(row => {
         const prevAvg = row.moving_avg_count ?? row.current_count;
+        const prevBuyAvg = row.moving_avg_buy_count ?? row.current_buy_count;
+        const prevSellAvg = row.moving_avg_sell_count ?? row.current_sell_count;
         const newAvg = alpha * row.current_count + (1 - alpha) * prevAvg;
+        const newBuyAvg = alpha * row.current_buy_count + (1 - alpha) * prevBuyAvg;
+        const newSellAvg = alpha * row.current_sell_count + (1 - alpha) * prevSellAvg;
         return {
             sku: row.sku,
-            moving_avg_count: newAvg
+            moving_avg_count: newAvg,
+            moving_avg_buy_count: newBuyAvg,
+            moving_avg_sell_count: newSellAvg
         };
     }).filter(u => {
-        // Only update if value actually changes (optional)
         const orig = stats.find(r => r.sku === u.sku);
-        return Math.abs((orig.moving_avg_count ?? orig.current_count) - u.moving_avg_count) > 1e-6;
+        return (
+            Math.abs((orig.moving_avg_count ?? orig.current_count) - u.moving_avg_count) > 1e-6 ||
+            Math.abs((orig.moving_avg_buy_count ?? orig.current_buy_count) - u.moving_avg_buy_count) > 1e-6 ||
+            Math.abs((orig.moving_avg_sell_count ?? orig.current_sell_count) - u.moving_avg_sell_count) > 1e-6
+        );
     });
 
     if (updates.length === 0) {
@@ -247,21 +261,27 @@ async function updateMovingAverages(alpha = 0.35) {
         return;
     }
 
-    const cs = new pgp.helpers.ColumnSet(['sku', 'moving_avg_count'], { table: 'tmp' });
+    const cs = new pgp.helpers.ColumnSet(
+        ['sku', 'moving_avg_count', 'moving_avg_buy_count', 'moving_avg_sell_count'],
+        { table: 'tmp' }
+    );
     const values = pgp.helpers.values(updates, cs);
 
     try {
         await db.none(`
             UPDATE listing_stats AS ls
-            SET moving_avg_count = tmp.moving_avg_count, last_updated = NOW()
-            FROM (VALUES ${values}) AS tmp(sku, moving_avg_count)
+            SET moving_avg_count = tmp.moving_avg_count,
+                moving_avg_buy_count = tmp.moving_avg_buy_count,
+                moving_avg_sell_count = tmp.moving_avg_sell_count,
+                last_updated = NOW()
+            FROM (VALUES ${values}) AS tmp(sku, moving_avg_count, moving_avg_buy_count, moving_avg_sell_count)
             WHERE ls.sku = tmp.sku
         `);
 
         // Fetch and log updated rows for validation
         const updatedSkus = updates.map(u => u.sku);
         const updatedRows = await db.any(
-            `SELECT sku, moving_avg_count FROM listing_stats WHERE sku IN ($1:csv) ORDER BY sku`,
+            `SELECT sku, moving_avg_count, moving_avg_buy_count, moving_avg_sell_count FROM listing_stats WHERE sku IN ($1:csv) ORDER BY sku`,
             [updatedSkus]
         );
         console.log('Updated moving averages:', updatedRows);
@@ -354,16 +374,26 @@ const getListings = async (name, intent) => {
 
 // Helper to update stats after insert/delete
 async function updateListingStats(sku) {
-    // Get current count
-    const { count } = await db.one(
+    // Get overall, buy, and sell counts
+    const { count: overallCount } = await db.one(
         `SELECT COUNT(*) FROM listings WHERE sku = $1`, [sku]
+    );
+    const { count: buyCount } = await db.one(
+        `SELECT COUNT(*) FROM listings WHERE sku = $1 AND intent = 'buy'`, [sku]
+    );
+    const { count: sellCount } = await db.one(
+        `SELECT COUNT(*) FROM listings WHERE sku = $1 AND intent = 'sell'`, [sku]
     );
     // Update or insert stats row
     await db.none(`
-        INSERT INTO listing_stats (sku, current_count, last_updated)
-        VALUES ($1, $2, NOW())
-        ON CONFLICT (sku) DO UPDATE SET current_count = $2, last_updated = NOW()
-    `, [sku, count]);
+        INSERT INTO listing_stats (sku, current_count, current_buy_count, current_sell_count, last_updated)
+        VALUES ($1, $2, $3, $4, NOW())
+        ON CONFLICT (sku) DO UPDATE SET
+            current_count = $2,
+            current_buy_count = $3,
+            current_sell_count = $4,
+            last_updated = NOW()
+    `, [sku, overallCount, buyCount, sellCount]);
 }
 
 const insertListing = async (response_item, sku, currencies, intent, steamid) => {
@@ -390,65 +420,64 @@ const insertListing = async (response_item, sku, currencies, intent, steamid) =>
 const HARD_MAX_AGE_SECONDS = 5 * 24 * 60 * 60; // 5 days
 
 const deleteOldListings = async () => {
-    const stats = await db.any(`SELECT sku, moving_avg_count FROM listing_stats`);
-    const veryActive = [];
-    const active = [];
-    const moderatelyActive = [];
-    const somewhatActive = [];
-    const lowActive = [];
-    const rare = [];
+    const stats = await db.any(`SELECT sku, moving_avg_buy_count, moving_avg_sell_count FROM listing_stats`);
+    const buyBands = { veryActive: [], active: [], moderatelyActive: [], somewhatActive: [], lowActive: [], rare: [] };
+    const sellBands = { veryActive: [], active: [], moderatelyActive: [], somewhatActive: [], lowActive: [], rare: [] };
 
     for (const row of stats) {
-        if (row.moving_avg_count > 18) veryActive.push(row.sku);
-        else if (row.moving_avg_count > 14) active.push(row.sku);
-        else if (row.moving_avg_count > 10) moderatelyActive.push(row.sku);
-        else if (row.moving_avg_count > 5) somewhatActive.push(row.sku);
-        else if (row.moving_avg_count > 3) lowActive.push(row.sku);
-        else rare.push(row.sku);
+        // Buy bands
+        if (row.moving_avg_buy_count > 18) buyBands.veryActive.push(row.sku);
+        else if (row.moving_avg_buy_count > 14) buyBands.active.push(row.sku);
+        else if (row.moving_avg_buy_count > 10) buyBands.moderatelyActive.push(row.sku);
+        else if (row.moving_avg_buy_count > 5) buyBands.somewhatActive.push(row.sku);
+        else if (row.moving_avg_buy_count > 3) buyBands.lowActive.push(row.sku);
+        else buyBands.rare.push(row.sku);
+
+        // Sell bands
+        if (row.moving_avg_sell_count > 18) sellBands.veryActive.push(row.sku);
+        else if (row.moving_avg_sell_count > 14) sellBands.active.push(row.sku);
+        else if (row.moving_avg_sell_count > 10) sellBands.moderatelyActive.push(row.sku);
+        else if (row.moving_avg_sell_count > 5) sellBands.somewhatActive.push(row.sku);
+        else if (row.moving_avg_sell_count > 3) sellBands.lowActive.push(row.sku);
+        else sellBands.rare.push(row.sku);
     }
 
-    // Batch delete for very active (35 min)
-    if (veryActive.length > 0) {
+    // Now delete buy listings by their bands
+    for (const [band, skus] of Object.entries(buyBands)) {
+        if (skus.length === 0) continue;
+        let age;
+        switch (band) {
+            case 'veryActive': age = 35 * 60; break;
+            case 'active': age = 2 * 3600; break;
+            case 'moderatelyActive': age = 6 * 3600; break;
+            case 'somewhatActive': age = 24 * 3600; break;
+            case 'lowActive': age = 3 * 24 * 3600; break;
+            case 'rare': age = 5 * 24 * 3600; break;
+        }
         await db.none(
-            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
-            [veryActive, 35 * 60]
+            `DELETE FROM listings WHERE sku IN ($1:csv) AND intent = 'buy' AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
+            [skus, age]
         );
     }
-    // Batch delete for active (2h)
-    if (active.length > 0) {
+
+    // Now delete sell listings by their bands
+    for (const [band, skus] of Object.entries(sellBands)) {
+        if (skus.length === 0) continue;
+        let age;
+        switch (band) {
+            case 'veryActive': age = 35 * 60; break;
+            case 'active': age = 2 * 3600; break;
+            case 'moderatelyActive': age = 6 * 3600; break;
+            case 'somewhatActive': age = 24 * 3600; break;
+            case 'lowActive': age = 3 * 24 * 3600; break;
+            case 'rare': age = 5 * 24 * 3600; break;
+        }
         await db.none(
-            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
-            [active, 2 * 3600]
+            `DELETE FROM listings WHERE sku IN ($1:csv) AND intent = 'sell' AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
+            [skus, age]
         );
     }
-    // Batch delete for moderately active (6h)
-    if (moderatelyActive.length > 0) {
-        await db.none(
-            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
-            [moderatelyActive, 6 * 3600]
-        );
-    }
-    // Batch delete for somewhat active (24h)
-    if (somewhatActive.length > 0) {
-        await db.none(
-            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
-            [somewhatActive, 24 * 3600]
-        );
-    }
-    // Batch delete for low active (3d)
-    if (lowActive.length > 0) {
-        await db.none(
-            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
-            [lowActive, 3 * 24 * 3600]
-        );
-    }
-    // Batch delete for rare (5d)
-    if (rare.length > 0) {
-        await db.none(
-            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
-            [rare, HARD_MAX_AGE_SECONDS]
-        );
-    }
+
     // Failsafe: delete any listing older than the hard max age
     await db.none(
         `DELETE FROM listings WHERE EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $1`,
