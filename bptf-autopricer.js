@@ -270,6 +270,14 @@ async function updateMovingAverages(alpha = 0.35) {
     }
 }
 
+// Initialize listing stats for all SKUs in the database.
+async function initializeListingStats() {
+    const skus = await db.any(`SELECT DISTINCT sku FROM listings`);
+    for (const { sku } of skus) {
+        await updateListingStats(sku);
+    }
+}
+
 // When the schema manager is ready we proceed.
 schemaManager.init(async function(err) {
     if (err) {
