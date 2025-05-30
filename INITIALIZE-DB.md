@@ -7,9 +7,7 @@ If you want to use the default database settings as provided in the config.json 
    - If no password was required, then you likely need to create one for this user, use the following command in the open psql session:
    - \password postgres and enter a new password when prompted.
 4. Type CREATE DATABASE "bptf-autopricer"; and hit enter.
-   - **!IMPORTANT!**: If you are setting up this auto pricer to be used alongside my [**tf2-trading-bot** project](https://github.com/jack-richards/tf2-trading-bot), run the following command instead:
-      - CREATE DATABASE "trading_bot";
-   - Then change the database ["name" field in the config](https://github.com/jack-richards/bptf-autopricer/blob/main/config.json#L9) to "trading_bot" so that it matches.
+   - **!IMPORTANT!**: 
 6. Type \c "name of the database you just created" and hit enter
 7. Type \i path/to/initialize-db.sql and hit enter
    - The path/to/ is a placeholder; it should be replaced with the full path to the initialize-db.sql file.
