@@ -22,4 +22,8 @@ CREATE TABLE tf2.listing_stats (
     current_count INTEGER DEFAULT 0,
     moving_avg_count REAL DEFAULT 0,
     last_updated TIMESTAMP DEFAULT NOW()
+    current_buy_count integer DEFAULT 0,
+    moving_avg_buy_count real DEFAULT 0,
+    current_sell_count integer DEFAULT 0,
+    moving_avg_sell_count real DEFAULT 0;
 );

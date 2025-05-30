@@ -20,6 +20,17 @@ const {
     adjustPrice,
     checkKeyPriceStability
 } = require('./modules/keyPriceUtils');
+const {
+    updateMovingAverages,
+    updateListingStats,
+    initializeListingStats
+} = require('./modules/listingAverages');
+const {
+    getListings,
+    insertListing,
+    deleteRemovedListing,
+    deleteOldListings
+} = require('./modules/listings');
 const logDir = path.join(__dirname, 'logs');
 const logFile = path.join(logDir, 'websocket.log');
 if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
@@ -172,7 +183,7 @@ watcher.on('change', path => {
 
 const calculateAndEmitPrices = async () => {
     // Delete old listings from database.
-    await deleteOldListings();
+    await deleteOldListings(db);
     // If the allowedItemNames is empty, we skip the pricing process.
     let item_objects = [];
     for (const name of allowedItemNames) {
@@ -220,64 +231,6 @@ const calculateAndEmitPrices = async () => {
     }
 };
 
-// Exponential moving average update
-async function updateMovingAverages(alpha = 0.35) {
-    if (alpha <= 0 || alpha > 1) {
-        throw new Error('Alpha must be between 0 (exclusive) and 1 (inclusive).');
-    }
-    const stats = await db.any(`SELECT sku, current_count, moving_avg_count FROM listing_stats`);
-    if (stats.length === 0) return;
-
-    // Prepare batch update data, only if value changes
-    const updates = stats.map(row => {
-        const prevAvg = row.moving_avg_count ?? row.current_count;
-        const newAvg = alpha * row.current_count + (1 - alpha) * prevAvg;
-        return {
-            sku: row.sku,
-            moving_avg_count: newAvg
-        };
-    }).filter(u => {
-        // Only update if value actually changes (optional)
-        const orig = stats.find(r => r.sku === u.sku);
-        return Math.abs((orig.moving_avg_count ?? orig.current_count) - u.moving_avg_count) > 1e-6;
-    });
-
-    if (updates.length === 0) {
-        console.log('No moving averages changed.');
-        return;
-    }
-
-    const cs = new pgp.helpers.ColumnSet(['sku', 'moving_avg_count'], { table: 'tmp' });
-    const values = pgp.helpers.values(updates, cs);
-
-    try {
-        await db.none(`
-            UPDATE listing_stats AS ls
-            SET moving_avg_count = tmp.moving_avg_count, last_updated = NOW()
-            FROM (VALUES ${values}) AS tmp(sku, moving_avg_count)
-            WHERE ls.sku = tmp.sku
-        `);
-
-        // Fetch and log updated rows for validation
-        const updatedSkus = updates.map(u => u.sku);
-        const updatedRows = await db.any(
-            `SELECT sku, moving_avg_count FROM listing_stats WHERE sku IN ($1:csv) ORDER BY sku`,
-            [updatedSkus]
-        );
-        console.log('Updated moving averages:', updatedRows);
-    } catch (err) {
-        console.error('Error updating moving averages:', err);
-    }
-}
-
-// Initialize listing stats for all SKUs in the database.
-async function initializeListingStats() {
-    const skus = await db.any(`SELECT DISTINCT sku FROM listings`);
-    for (const { sku } of skus) {
-        await updateListingStats(sku);
-    }
-}
-
 // When the schema manager is ready we proceed.
 schemaManager.init(async function(err) {
     if (err) {
@@ -299,7 +252,7 @@ schemaManager.init(async function(err) {
     // Calculate and emit prices on startup.
     await calculateAndEmitPrices();
     // Call this once at startup if needed
-    await initializeListingStats();
+    await initializeListingStats(db);
     //InitialKeyPricingContinued
     await checkKeyPriceStability({
         db,
@@ -343,138 +296,17 @@ schemaManager.init(async function(err) {
     }, 30 * 60 * 1000); // Check key price stability every 30 minutes
 
     // Schedule every 15 minutes
-    setInterval(async () => { await updateMovingAverages() }, 15 * 60 * 1000);
+    setInterval(async () => { await updateMovingAverages(db, pgp); }, 15 * 60 * 1000);
 	
 	startPriceWatcher(); //start webpage for price watching 
 });
 
-const getListings = async (name, intent) => {
-    return await db.result(`SELECT * FROM listings WHERE name = $1 AND intent = $2`, [name, intent]);
-};
-
-// Helper to update stats after insert/delete
-async function updateListingStats(sku) {
-    // Get current count
-    const { count } = await db.one(
-        `SELECT COUNT(*) FROM listings WHERE sku = $1`, [sku]
-    );
-    // Update or insert stats row
-    await db.none(`
-        INSERT INTO listing_stats (sku, current_count, last_updated)
-        VALUES ($1, $2, NOW())
-        ON CONFLICT (sku) DO UPDATE SET current_count = $2, last_updated = NOW()
-    `, [sku, count]);
-}
-
-const insertListing = async (response_item, sku, currencies, intent, steamid) => {
-    let timestamp = Math.floor(Date.now() / 1000);
-    const result = await db.none(
-        `INSERT INTO listings (name, sku, currencies, intent, updated, steamid)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (name, sku, intent, steamid)
-         DO UPDATE SET currencies = $3, updated = $5;`,
-        [response_item.name, sku, JSON.stringify(currencies), intent, timestamp, steamid]
-    );
-    await updateListingStats(sku);
-    return result;
-};
-
-// Arguably quite in-efficient but I don't see a good alternative at the moment.
-// 35 minutes old (or older) listings are removed.
-// Every 30 minutes listings on backpack.tf are bumped, given you have premium, which the majority of good bots do.
-// So, by setting the limit to 35 minutes it allows the pricer to catch those bump events and keep any related
-// listings in our database.
-
-// Otherwise, if the listing isn't bumped or we just don't recieve the event, we delete the old listing as it may have been deleted.
-// Backpack.tf may not have sent us the deleted event etc.
-const HARD_MAX_AGE_SECONDS = 5 * 24 * 60 * 60; // 5 days
-
-const deleteOldListings = async () => {
-    const stats = await db.any(`SELECT sku, moving_avg_count FROM listing_stats`);
-    const veryActive = [];
-    const active = [];
-    const moderatelyActive = [];
-    const somewhatActive = [];
-    const lowActive = [];
-    const rare = [];
-
-    for (const row of stats) {
-        if (row.moving_avg_count > 18) veryActive.push(row.sku);
-        else if (row.moving_avg_count > 14) active.push(row.sku);
-        else if (row.moving_avg_count > 10) moderatelyActive.push(row.sku);
-        else if (row.moving_avg_count > 5) somewhatActive.push(row.sku);
-        else if (row.moving_avg_count > 3) lowActive.push(row.sku);
-        else rare.push(row.sku);
-    }
-
-    // Batch delete for very active (35 min)
-    if (veryActive.length > 0) {
-        await db.none(
-            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
-            [veryActive, 35 * 60]
-        );
-    }
-    // Batch delete for active (2h)
-    if (active.length > 0) {
-        await db.none(
-            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
-            [active, 2 * 3600]
-        );
-    }
-    // Batch delete for moderately active (6h)
-    if (moderatelyActive.length > 0) {
-        await db.none(
-            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
-            [moderatelyActive, 6 * 3600]
-        );
-    }
-    // Batch delete for somewhat active (24h)
-    if (somewhatActive.length > 0) {
-        await db.none(
-            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
-            [somewhatActive, 24 * 3600]
-        );
-    }
-    // Batch delete for low active (3d)
-    if (lowActive.length > 0) {
-        await db.none(
-            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
-            [lowActive, 3 * 24 * 3600]
-        );
-    }
-    // Batch delete for rare (5d)
-    if (rare.length > 0) {
-        await db.none(
-            `DELETE FROM listings WHERE sku IN ($1:csv) AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2`,
-            [rare, HARD_MAX_AGE_SECONDS]
-        );
-    }
-    // Failsafe: delete any listing older than the hard max age
-    await db.none(
-        `DELETE FROM listings WHERE EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $1`,
-        [HARD_MAX_AGE_SECONDS]
-    );
-};
-
-const deleteRemovedListing = async (steamid, name, intent) => {
-    const sku = (await db.oneOrNone(
-        `SELECT sku FROM listings WHERE steamid = $1 AND name = $2 AND intent = $3 LIMIT 1`,
-        [steamid, name, intent]
-    ))?.sku;
-    const result = await db.any(
-        `DELETE FROM listings WHERE steamid = $1 AND name = $2 AND intent = $3;`,
-        [steamid, name, intent]
-    );
-    if (sku) await updateListingStats(sku);
-    return result;
-};
-
 const determinePrice = async (name, sku) => {
     // Delete listings that are greater than 30 minutes old.
-    await deleteOldListings();
+    await deleteOldListings(db);
 
-    var buyListings = await getListings(name, 'buy');
-    var sellListings = await getListings(name, 'sell');
+    var buyListings = await getListings(db, name, 'buy');
+    var sellListings = await getListings(db, name, 'sell');
 
 
     // Get the price of the item from the in-memory external pricelist.
@@ -800,8 +632,8 @@ const rws = initBptfWebSocket({
     allowedItemNames,
     schemaManager,
     Methods,
-    insertListing,
-    deleteRemovedListing,
+    insertListing: (...args) => insertListing(db, updateListingStats, ...args),
+    deleteRemovedListing: (...args) => deleteRemovedListing(db, updateListingStats, ...args),
     excludedSteamIds,
     excludedListingDescriptions,
     blockedAttributes,
