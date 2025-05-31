@@ -14,17 +14,6 @@ router.get('/:sku', async (req, res) => {
   let item_found = false;
   let item_object = {};
 
-  try {
-    // Getting key price. Request from prices.tf.
-    if(req.params.sku === '5021;6') {
-      key_object = await Methods.getKeyFromExternalAPI();
-      return res.status(200).json(key_object);
-    }
-  } catch (e) {
-    console.error("| AUTOPRICER API | Couldn't fetch key price from Prices.tf");
-    return res.sendStatus(400);
-  }
-
   fs.readFile(PRICELIST_PATH, 'utf8', (err, data) => {
       if(err) {
         // req.reject etc.
