@@ -157,14 +157,23 @@ const updateKeyObject = async () => {
 const { initBptfWebSocket } = require('./websocket/bptfWebSocket');
 
 let allowedItemNames = new Set();
+let itemBounds = new Map(); // name -> {minBuy, maxBuy, minSell, maxSell}
 
-// Read and initialize the names of the items we want to get prices for.
 const loadNames = () => {
     try {
-        const jsonContent = JSON.parse(fs.readFileSync(ITEM_LIST_PATH), 'utf8');
+        const jsonContent = JSON.parse(fs.readFileSync(ITEM_LIST_PATH, 'utf8'));
         if (jsonContent && jsonContent.items && Array.isArray(jsonContent.items)) {
             allowedItemNames = new Set(jsonContent.items.map(item => item.name));
-            console.log('Updated allowed item names.');
+            itemBounds = new Map();
+            for (const item of jsonContent.items) {
+                itemBounds.set(item.name, {
+                    minBuy: typeof item.minBuy === 'number' ? item.minBuy : undefined,
+                    maxBuy: typeof item.maxBuy === 'number' ? item.maxBuy : undefined,
+                    minSell: typeof item.minSell === 'number' ? item.minSell : undefined,
+                    maxSell: typeof item.maxSell === 'number' ? item.maxSell : undefined
+                });
+            }
+            console.log('Updated allowed item names and bounds.');
         }
     } catch (error) {
         console.error('Error reading and updating allowed item names', error);
@@ -369,8 +378,6 @@ const determinePrice = async (name, sku) => {
 
         return valueA - valueB;
     });
-
-    // TODO filter out listings that include painted hats.
 
     // We prioritise using listings from bots in our prioritySteamIds list.
     // I.e., we move listings by those trusted steamids to the front of the
@@ -618,6 +625,15 @@ const finalisePrice = (arr, name, sku) => {
                     metal: Methods.getRight(arr[1].metal)
                 };
             }
+            // Clamp prices to bounds if set
+            const bounds = itemBounds.get(name) || {};
+            // Clamp buy
+            if (typeof bounds.minBuy === 'number' && arr[0].metal < bounds.minBuy) arr[0].metal = bounds.minBuy;
+            if (typeof bounds.maxBuy === 'number' && arr[0].metal > bounds.maxBuy) arr[0].metal = bounds.maxBuy;
+            // Clamp sell
+            if (typeof bounds.minSell === 'number' && arr[1].metal < bounds.minSell) arr[1].metal = bounds.minSell;
+            if (typeof bounds.maxSell === 'number' && arr[1].metal > bounds.maxSell) arr[1].metal = bounds.maxSell;
+
             // Return the new item object with the latest price.
             return item;
         }
