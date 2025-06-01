@@ -1,9 +1,6 @@
 const express = require('express');
 const fs = require('fs');
 
-const methods = require('../../../methods');
-const Methods = new methods();
-
 const router = express.Router();
 
 const PRICELIST_PATH = './files/pricelist.json'
