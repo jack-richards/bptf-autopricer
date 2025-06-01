@@ -10,6 +10,10 @@ async function updateMovingAverages(db, pgp, alpha = 0.35) {
     `);
     if (stats.length === 0) return;
 
+    // clampAndRound ensures all moving averages:
+    // - are rounded to 2 decimal places (e.g., 1.2345 -> 1.23)
+    // - never go below the minimum value (default 0.05, which is already very small for item averages)
+    // This prevents extremely small values that could cause database errors with float columns.
     const clampAndRound = (val, min = 0.05) => Math.max(min, Math.round(val * 100) / 100);
 
     const updates = stats.map(row => {
