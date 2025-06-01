@@ -77,6 +77,7 @@ module.exports = function renderPage(title, bodyContent) {
   <body>
     <nav>
       <a href="/">Price List</a>
+      <a href="/bounds">Edit Bounds</a>
       <a href="/key-prices">Key Graph</a>
       <a href="/pnl">Profit/Loss</a>
       <a href="/trades">Trade History</a>

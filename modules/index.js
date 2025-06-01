@@ -31,6 +31,7 @@ function mountRoutes() {
   require('./routes/actions')(app, config);
   require('./routes/logs')(app, config);
   require('./routes/pnl')(app, config);
+  require('./routes/bounds')(app, config); // <-- add this line
 }
 
 function startPriceWatcher() {

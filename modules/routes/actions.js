@@ -65,8 +65,8 @@ module.exports = function(app, config) {
   });
 
   app.post('/add-item', (req, res) => {
-    const { name, min, max } = req.body;
-    if (!name || isNaN(min) || isNaN(max)) return res.redirect('back');
+    const { name } = req.body;
+    if (!name) return res.redirect('back');
 
     const itemList = loadJson(itemListPath);
     if (!itemList.items.some(i => i.name === name)) {
@@ -75,7 +75,7 @@ module.exports = function(app, config) {
     }
 
     // Optionally log or store min/max for use elsewhere
-    console.log(`Added item: ${name} with min=${min}, max=${max}`);
+    console.log(`Added item: ${name}`);
 
     res.redirect('back');
   });

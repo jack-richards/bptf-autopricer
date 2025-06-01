@@ -157,14 +157,27 @@ const updateKeyObject = async () => {
 const { initBptfWebSocket } = require('./websocket/bptfWebSocket');
 
 let allowedItemNames = new Set();
+let itemBounds = new Map(); // name -> {minBuy, maxBuy, minSell, maxSell}
 
-// Read and initialize the names of the items we want to get prices for.
 const loadNames = () => {
     try {
-        const jsonContent = JSON.parse(fs.readFileSync(ITEM_LIST_PATH), 'utf8');
+        const jsonContent = JSON.parse(fs.readFileSync(ITEM_LIST_PATH, 'utf8'));
         if (jsonContent && jsonContent.items && Array.isArray(jsonContent.items)) {
             allowedItemNames = new Set(jsonContent.items.map(item => item.name));
-            console.log('Updated allowed item names.');
+            itemBounds = new Map();
+            for (const item of jsonContent.items) {
+                itemBounds.set(item.name, {
+                    minBuyKeys: typeof item.minBuyKeys === 'number' ? item.minBuyKeys : undefined,
+                    minBuyMetal: typeof item.minBuyMetal === 'number' ? item.minBuyMetal : undefined,
+                    maxBuyKeys: typeof item.maxBuyKeys === 'number' ? item.maxBuyKeys : undefined,
+                    maxBuyMetal: typeof item.maxBuyMetal === 'number' ? item.maxBuyMetal : undefined,
+                    minSellKeys: typeof item.minSellKeys === 'number' ? item.minSellKeys : undefined,
+                    minSellMetal: typeof item.minSellMetal === 'number' ? item.minSellMetal : undefined,
+                    maxSellKeys: typeof item.maxSellKeys === 'number' ? item.maxSellKeys : undefined,
+                    maxSellMetal: typeof item.maxSellMetal === 'number' ? item.maxSellMetal : undefined
+                });
+            }
+            console.log('Updated allowed item names and bounds.');
         }
     } catch (error) {
         console.error('Error reading and updating allowed item names', error);
@@ -369,8 +382,6 @@ const determinePrice = async (name, sku) => {
 
         return valueA - valueB;
     });
-
-    // TODO filter out listings that include painted hats.
 
     // We prioritise using listings from bots in our prioritySteamIds list.
     // I.e., we move listings by those trusted steamids to the front of the
@@ -618,6 +629,22 @@ const finalisePrice = (arr, name, sku) => {
                     metal: Methods.getRight(arr[1].metal)
                 };
             }
+            // Clamp prices to bounds if set
+            const bounds = itemBounds.get(name) || {};
+            // Clamp buy keys
+            if (typeof bounds.minBuyKeys === 'number' && arr[0].keys < bounds.minBuyKeys) arr[0].keys = bounds.minBuyKeys;
+            if (typeof bounds.maxBuyKeys === 'number' && arr[0].keys > bounds.maxBuyKeys) arr[0].keys = bounds.maxBuyKeys;
+            // Clamp buy metal
+            if (typeof bounds.minBuyMetal === 'number' && arr[0].metal < bounds.minBuyMetal) arr[0].metal = bounds.minBuyMetal;
+            if (typeof bounds.maxBuyMetal === 'number' && arr[0].metal > bounds.maxBuyMetal) arr[0].metal = bounds.maxBuyMetal;
+            // Clamp sell keys
+            if (typeof bounds.minSellKeys === 'number' && arr[1].keys < bounds.minSellKeys) arr[1].keys = bounds.minSellKeys;
+            if (typeof bounds.maxSellKeys === 'number' && arr[1].keys > bounds.maxSellKeys) arr[1].keys = bounds.maxSellKeys;
+            // Clamp sell metal
+            if (typeof bounds.minSellMetal === 'number' && arr[1].metal < bounds.minSellMetal) arr[1].metal = bounds.minSellMetal;
+            if (typeof bounds.maxSellMetal === 'number' && arr[1].metal > bounds.maxSellMetal) arr[1].metal = bounds.maxSellMetal;
+
+
             // Return the new item object with the latest price.
             return item;
         }
@@ -629,7 +656,7 @@ const finalisePrice = (arr, name, sku) => {
 
 // Initialize the websocket and pass in dependencies
 const rws = initBptfWebSocket({
-    allowedItemNames,
+    getAllowedItemNames: () => allowedItemNames,
     schemaManager,
     Methods,
     insertListing: (...args) => insertListing(db, updateListingStats, ...args),
