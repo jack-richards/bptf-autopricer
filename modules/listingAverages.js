@@ -10,13 +10,20 @@ async function updateMovingAverages(db, pgp, alpha = 0.35) {
     `);
     if (stats.length === 0) return;
 
+    const clampAndRound = (val, min = 0.05) => Math.max(min, Math.round(val * 100) / 100);
+
     const updates = stats.map(row => {
         const prevAvg = row.moving_avg_count ?? row.current_count;
         const prevBuyAvg = row.moving_avg_buy_count ?? row.current_buy_count;
         const prevSellAvg = row.moving_avg_sell_count ?? row.current_sell_count;
-        const newAvg = alpha * row.current_count + (1 - alpha) * prevAvg;
-        const newBuyAvg = alpha * row.current_buy_count + (1 - alpha) * prevBuyAvg;
-        const newSellAvg = alpha * row.current_sell_count + (1 - alpha) * prevSellAvg;
+        // Calculate new averages
+        let newAvg = alpha * row.current_count + (1 - alpha) * prevAvg;
+        let newBuyAvg = alpha * row.current_buy_count + (1 - alpha) * prevBuyAvg;
+        let newSellAvg = alpha * row.current_sell_count + (1 - alpha) * prevSellAvg;
+        // Clamp and round to 2 decimals, minimum 0.05
+        newAvg = clampAndRound(newAvg);
+        newBuyAvg = clampAndRound(newBuyAvg);
+        newSellAvg = clampAndRound(newSellAvg);
         return {
             sku: row.sku,
             moving_avg_count: newAvg,
