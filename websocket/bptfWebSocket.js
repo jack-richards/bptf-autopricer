@@ -32,7 +32,7 @@ function initBptfWebSocket({
             console.log('[WebSocket] Ignored event:', e);
             return;
         }
-        if (allowedItemNames.has(e.payload.item.name)) {
+        if (getAllowedItemNames().has(e.payload.item.name)) {
             let response_item = e.payload.item;
             let steamid = e.payload.steamid;
             let intent = e.payload.intent;

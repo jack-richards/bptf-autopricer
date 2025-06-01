@@ -656,7 +656,7 @@ const finalisePrice = (arr, name, sku) => {
 
 // Initialize the websocket and pass in dependencies
 const rws = initBptfWebSocket({
-    allowedItemNames,
+    getAllowedItemNames: () => allowedItemNames,
     schemaManager,
     Methods,
     insertListing: (...args) => insertListing(db, updateListingStats, ...args),
