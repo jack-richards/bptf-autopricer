@@ -13,20 +13,28 @@ module.exports = function (app, config) {
         <thead>
             <tr>
                 <th>Name</th>
-                <th>Min Buy</th>
-                <th>Max Buy</th>
-                <th>Min Sell</th>
-                <th>Max Sell</th>
+                <th>Min Buy Keys</th>
+                <th>Min Buy Metal</th>
+                <th>Max Buy Keys</th>
+                <th>Max Buy Metal</th>
+                <th>Min Sell Keys</th>
+                <th>Min Sell Metal</th>
+                <th>Max Sell Keys</th>
+                <th>Max Sell Metal</th>
             </tr>
         </thead>
         <tbody>`;
         items.forEach((item, idx) => {
             tbl += `<tr>
                 <td>${item.name}</td>
-                <td><input type="number" step="0.01" name="minBuy_${idx}" value="${item.minBuy ?? ''}" style="width:80px"></td>
-                <td><input type="number" step="0.01" name="maxBuy_${idx}" value="${item.maxBuy ?? ''}" style="width:80px"></td>
-                <td><input type="number" step="0.01" name="minSell_${idx}" value="${item.minSell ?? ''}" style="width:80px"></td>
-                <td><input type="number" step="0.01" name="maxSell_${idx}" value="${item.maxSell ?? ''}" style="width:80px"></td>
+                <td><input type="number" step="1" name="minBuyKeys_${idx}" value="${item.minBuyKeys ?? ''}" style="width:60px"></td>
+                <td><input type="number" step="0.01" name="minBuyMetal_${idx}" value="${item.minBuyMetal ?? ''}" style="width:80px"></td>
+                <td><input type="number" step="1" name="maxBuyKeys_${idx}" value="${item.maxBuyKeys ?? ''}" style="width:60px"></td>
+                <td><input type="number" step="0.01" name="maxBuyMetal_${idx}" value="${item.maxBuyMetal ?? ''}" style="width:80px"></td>
+                <td><input type="number" step="1" name="minSellKeys_${idx}" value="${item.minSellKeys ?? ''}" style="width:60px"></td>
+                <td><input type="number" step="0.01" name="minSellMetal_${idx}" value="${item.minSellMetal ?? ''}" style="width:80px"></td>
+                <td><input type="number" step="1" name="maxSellKeys_${idx}" value="${item.maxSellKeys ?? ''}" style="width:60px"></td>
+                <td><input type="number" step="0.01" name="maxSellMetal_${idx}" value="${item.maxSellMetal ?? ''}" style="width:80px"></td>
                 <input type="hidden" name="name_${idx}" value="${item.name}">
             </tr>`;
         });
@@ -52,16 +60,16 @@ module.exports = function (app, config) {
         const count = parseInt(req.body.count) || 0;
         for (let i = 0; i < count; i++) {
             const name = req.body[`name_${i}`];
-            const minBuy = req.body[`minBuy_${i}`];
-            const maxBuy = req.body[`maxBuy_${i}`];
-            const minSell = req.body[`minSell_${i}`];
-            const maxSell = req.body[`maxSell_${i}`];
+            const fields = [
+                'minBuyKeys', 'minBuyMetal', 'maxBuyKeys', 'maxBuyMetal',
+                'minSellKeys', 'minSellMetal', 'maxSellKeys', 'maxSellMetal'
+            ];
             const item = itemList.items.find(it => it.name === name);
             if (item) {
-                item.minBuy = minBuy !== '' ? parseFloat(minBuy) : undefined;
-                item.maxBuy = maxBuy !== '' ? parseFloat(maxBuy) : undefined;
-                item.minSell = minSell !== '' ? parseFloat(minSell) : undefined;
-                item.maxSell = maxSell !== '' ? parseFloat(maxSell) : undefined;
+                for (const field of fields) {
+                    const val = req.body[`${field}_${i}`];
+                    item[field] = val !== '' && val !== undefined ? parseFloat(val) : undefined;
+                }
             }
         }
         saveJson(itemListPath, itemList);

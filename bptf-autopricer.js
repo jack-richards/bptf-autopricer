@@ -167,10 +167,14 @@ const loadNames = () => {
             itemBounds = new Map();
             for (const item of jsonContent.items) {
                 itemBounds.set(item.name, {
-                    minBuy: typeof item.minBuy === 'number' ? item.minBuy : undefined,
-                    maxBuy: typeof item.maxBuy === 'number' ? item.maxBuy : undefined,
-                    minSell: typeof item.minSell === 'number' ? item.minSell : undefined,
-                    maxSell: typeof item.maxSell === 'number' ? item.maxSell : undefined
+                    minBuyKeys: typeof item.minBuyKeys === 'number' ? item.minBuyKeys : undefined,
+                    minBuyMetal: typeof item.minBuyMetal === 'number' ? item.minBuyMetal : undefined,
+                    maxBuyKeys: typeof item.maxBuyKeys === 'number' ? item.maxBuyKeys : undefined,
+                    maxBuyMetal: typeof item.maxBuyMetal === 'number' ? item.maxBuyMetal : undefined,
+                    minSellKeys: typeof item.minSellKeys === 'number' ? item.minSellKeys : undefined,
+                    minSellMetal: typeof item.minSellMetal === 'number' ? item.minSellMetal : undefined,
+                    maxSellKeys: typeof item.maxSellKeys === 'number' ? item.maxSellKeys : undefined,
+                    maxSellMetal: typeof item.maxSellMetal === 'number' ? item.maxSellMetal : undefined
                 });
             }
             console.log('Updated allowed item names and bounds.');
@@ -627,12 +631,19 @@ const finalisePrice = (arr, name, sku) => {
             }
             // Clamp prices to bounds if set
             const bounds = itemBounds.get(name) || {};
-            // Clamp buy
-            if (typeof bounds.minBuy === 'number' && arr[0].metal < bounds.minBuy) arr[0].metal = bounds.minBuy;
-            if (typeof bounds.maxBuy === 'number' && arr[0].metal > bounds.maxBuy) arr[0].metal = bounds.maxBuy;
-            // Clamp sell
-            if (typeof bounds.minSell === 'number' && arr[1].metal < bounds.minSell) arr[1].metal = bounds.minSell;
-            if (typeof bounds.maxSell === 'number' && arr[1].metal > bounds.maxSell) arr[1].metal = bounds.maxSell;
+            // Clamp buy keys
+            if (typeof bounds.minBuyKeys === 'number' && arr[0].keys < bounds.minBuyKeys) arr[0].keys = bounds.minBuyKeys;
+            if (typeof bounds.maxBuyKeys === 'number' && arr[0].keys > bounds.maxBuyKeys) arr[0].keys = bounds.maxBuyKeys;
+            // Clamp buy metal
+            if (typeof bounds.minBuyMetal === 'number' && arr[0].metal < bounds.minBuyMetal) arr[0].metal = bounds.minBuyMetal;
+            if (typeof bounds.maxBuyMetal === 'number' && arr[0].metal > bounds.maxBuyMetal) arr[0].metal = bounds.maxBuyMetal;
+            // Clamp sell keys
+            if (typeof bounds.minSellKeys === 'number' && arr[1].keys < bounds.minSellKeys) arr[1].keys = bounds.minSellKeys;
+            if (typeof bounds.maxSellKeys === 'number' && arr[1].keys > bounds.maxSellKeys) arr[1].keys = bounds.maxSellKeys;
+            // Clamp sell metal
+            if (typeof bounds.minSellMetal === 'number' && arr[1].metal < bounds.minSellMetal) arr[1].metal = bounds.minSellMetal;
+            if (typeof bounds.maxSellMetal === 'number' && arr[1].metal > bounds.maxSellMetal) arr[1].metal = bounds.maxSellMetal;
+
 
             // Return the new item object with the latest price.
             return item;
