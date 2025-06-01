@@ -9,7 +9,7 @@ function logWebSocketEvent(logFile, message) {
 }
 
 function initBptfWebSocket({
-    allowedItemNames,
+    getAllowedItemNames,
     schemaManager,
     Methods,
     insertListing,
