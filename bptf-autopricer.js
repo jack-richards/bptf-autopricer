@@ -314,6 +314,24 @@ schemaManager.init(async function(err) {
 	startPriceWatcher(); //start webpage for price watching 
 });
 
+function isPriceSwingAcceptable(prev, next) {
+    // Convert to metal for comparison
+    const prevBuy = Methods.toMetal(prev.buy, keyobj.metal);
+    const nextBuy = Methods.toMetal(next.buy, keyobj.metal);
+    const prevSell = Methods.toMetal(prev.sell, keyobj.metal);
+    const nextSell = Methods.toMetal(next.sell, keyobj.metal);
+
+    // Block buy price increases > 10%
+    if (nextBuy > prevBuy && (nextBuy - prevBuy) / prevBuy > 0.10) {
+        return false;
+    }
+    // Block sell price decreases > 10%
+    if (nextSell < prevSell && (prevSell - nextSell) / prevSell > 0.10) {
+        return false;
+    }
+    return true;
+}
+
 const determinePrice = async (name, sku) => {
     // Delete listings that are greater than 30 minutes old.
     await deleteOldListings(db);
@@ -644,6 +662,19 @@ const finalisePrice = (arr, name, sku) => {
             if (typeof bounds.minSellMetal === 'number' && arr[1].metal < bounds.minSellMetal) arr[1].metal = bounds.minSellMetal;
             if (typeof bounds.maxSellMetal === 'number' && arr[1].metal > bounds.maxSellMetal) arr[1].metal = bounds.maxSellMetal;
 
+            // Load previous price from pricelist if available
+            const pricelist = JSON.parse(fs.readFileSync(PRICELIST_PATH, 'utf8'));
+            const prev = pricelist.items.find(i => i.sku === sku);
+
+            // Only check if previous price exists
+            if (prev) {
+                const prevObj = { buy: prev.buy, sell: prev.sell };
+                const nextObj = { buy: item.buy, sell: item.sell };
+                if (!isPriceSwingAcceptable(prevObj, nextObj)) {
+                    console.log(`Price swing too large for ${name} (${sku}), skipping update.`);
+                    return; // Drop the price update
+                }
+            }
 
             // Return the new item object with the latest price.
             return item;
