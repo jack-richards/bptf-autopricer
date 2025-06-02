@@ -5,9 +5,11 @@ const chokidar = require('chokidar');
 const methods = require('./methods');
 const Methods = new methods();
 const path = require('path');
+const { validateConfig } = require('./modules/configValidation');
+const CONFIG_PATH = path.resolve(__dirname, 'config.json');
+const config = validateConfig(CONFIG_PATH);
 const PriceWatcher = require('./modules/PriceWatcher'); //outdated price logging
 const Schema = require('@tf2autobot/tf2-schema');
-const config = require('./config.json');
 const SCHEMA_PATH = './schema.json';
 const PRICELIST_PATH = './files/pricelist.json';
 const ITEM_LIST_PATH = './files/item_list.json';
@@ -205,7 +207,7 @@ const calculateAndEmitPrices = async () => {
             let sku = schemaManager.schema.getSkuFromName(name);
             // Start process of pricing item.
             let arr = await determinePrice(name, sku);
-            let item = finalisePrice(arr, name, sku);
+            let item = await finalisePrice(arr, name, sku);
             // If the item is undefined, we skip it.
             if (!item) {
                 continue;
@@ -314,26 +316,34 @@ schemaManager.init(async function(err) {
 	startPriceWatcher(); //start webpage for price watching 
 });
 
-function isPriceSwingAcceptable(prev, next) {
-    // Convert to metal for comparison
-    const prevBuy = Methods.toMetal(prev.buy, keyobj.metal);
+async function isPriceSwingAcceptable(prev, next, sku) {
+    // Fetch last 5 prices from DB
+    const history = await db.any(
+        'SELECT buy_metal, sell_metal FROM price_history WHERE sku = $1 ORDER BY timestamp DESC LIMIT 5',
+        [sku]
+    );
+    if (history.length === 0) return true; // No history, allow
+
+    const avgBuy = history.reduce((sum, p) => sum + Number(p.buy_metal), 0) / history.length;
+    const avgSell = history.reduce((sum, p) => sum + Number(p.sell_metal), 0) / history.length;
+
     const nextBuy = Methods.toMetal(next.buy, keyobj.metal);
-    const prevSell = Methods.toMetal(prev.sell, keyobj.metal);
     const nextSell = Methods.toMetal(next.sell, keyobj.metal);
 
-    // Block buy price increases > 10%
-    if (nextBuy > prevBuy && (nextBuy - prevBuy) / prevBuy > 0.10) {
+    const maxBuyIncrease = config.priceSwingLimits?.maxBuyIncrease ?? 0.10;
+    const maxSellDecrease = config.priceSwingLimits?.maxSellDecrease ?? 0.10;
+
+    if (nextBuy > avgBuy && (nextBuy - avgBuy) / avgBuy > maxBuyIncrease) {
         return false;
     }
-    // Block sell price decreases > 10%
-    if (nextSell < prevSell && (prevSell - nextSell) / prevSell > 0.10) {
+    if (nextSell < avgSell && (avgSell - nextSell) / avgSell > maxSellDecrease) {
         return false;
     }
     return true;
 }
 
 const determinePrice = async (name, sku) => {
-    // Delete listings that are greater than 30 minutes old.
+    // Delete listings based on moving averages.
     await deleteOldListings(db);
 
     var buyListings = await getListings(db, name, 'buy');
@@ -578,7 +588,7 @@ const getAverages = (name, buyFiltered, sellFiltered, sku, pricetfItem) => {
     };
 };
 
-const finalisePrice = (arr, name, sku) => {
+const finalisePrice = async (arr, name, sku) => {
     let item = {};
     try {
         if (!arr) {
@@ -614,39 +624,17 @@ const finalisePrice = (arr, name, sku) => {
             arr[0] = Methods.parsePrice(arr[0], keyobj.metal);
             arr[1] = Methods.parsePrice(arr[1], keyobj.metal);
 
-            // Calculates the pure value of the keys involved and adds it to the pure metal.
-            // We use this to easily compare the listing 'costs' shortly.
-            var buyInMetal = Methods.toMetal(arr[0], keyobj.metal);
-            var sellInMetal = Methods.toMetal(arr[1], keyobj.metal);
-
-            // If the buy price in metal for the listing is greater than or equal to the sell price
-            // we ensure the metal is in the correct format again, and we re-use the already validated
-            // key price.
-
-            // The main point here is that we use the buy price as the selling price, adding 0.11 as a margin.
-            // This way if the buy price turns out to be higher than our averaged selling price, we don't
-            // get screwed in this respect.
+            // Enforce minSellMargin from config
+            const minSellMargin = config.minSellMargin ?? 0.11;
+            const buyInMetal = Methods.toMetal(arr[0], keyobj.metal);
+            const sellInMetal = Methods.toMetal(arr[1], keyobj.metal);
             if (buyInMetal >= sellInMetal) {
-                item.buy = {
-                    keys: arr[0].keys,
-                    metal: Methods.getRight(arr[0].metal)
-                };
-                item.sell = {
-                    keys: arr[0].keys,
-                    metal: Methods.getRight(arr[0].metal + 0.11)
-                };
-            } else {
-                // If the buy price is less than our selling price, we just
-                // use them as expected, sell price for sell, buy for buy.
-                item.buy = {
-                    keys: arr[0].keys,
-                    metal: Methods.getRight(arr[0].metal)
-                };
-                item.sell = {
-                    keys: arr[1].keys,
-                    metal: Methods.getRight(arr[1].metal)
-                };
+                arr[1].metal = Methods.getRight(buyInMetal + minSellMargin);
             }
+
+            item.buy = arr[0];
+            item.sell = arr[1];
+
             // Clamp prices to bounds if set
             const bounds = itemBounds.get(name) || {};
             // Clamp buy keys
@@ -670,11 +658,22 @@ const finalisePrice = (arr, name, sku) => {
             if (prev) {
                 const prevObj = { buy: prev.buy, sell: prev.sell };
                 const nextObj = { buy: item.buy, sell: item.sell };
-                if (!isPriceSwingAcceptable(prevObj, nextObj)) {
+                const swingOk = await isPriceSwingAcceptable(prevObj, nextObj, sku);
+                if (!swingOk) {
                     console.log(`Price swing too large for ${name} (${sku}), skipping update.`);
-                    return; // Drop the price update
+                    return;
                 }
             }
+
+            // Save to price history
+            await db.none(
+                'INSERT INTO price_history (sku, buy_metal, sell_metal, timestamp) VALUES ($1, $2, $3, NOW())',
+                [
+                    sku,
+                    Methods.toMetal(item.buy, keyobj.metal),
+                    Methods.toMetal(item.sell, keyobj.metal)
+                ]
+            );
 
             // Return the new item object with the latest price.
             return item;
