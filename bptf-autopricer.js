@@ -626,14 +626,28 @@ const finalisePrice = async (arr, name, sku) => {
 
             // Enforce minSellMargin from config
             const minSellMargin = config.minSellMargin ?? 0.11;
-            const buyInMetal = Methods.toMetal(arr[0], keyobj.metal);
-            const sellInMetal = Methods.toMetal(arr[1], keyobj.metal);
-            if (buyInMetal >= sellInMetal) {
-                arr[1].metal = Methods.getRight(buyInMetal + minSellMargin);
-            }
+            var buyInMetal = Methods.toMetal(arr[0], keyobj.metal);
+            var sellInMetal = Methods.toMetal(arr[1], keyobj.metal);
 
-            item.buy = arr[0];
-            item.sell = arr[1];
+            if (buyInMetal >= sellInMetal) {
+                item.buy = {
+                    keys: arr[0].keys,
+                    metal: Methods.getRight(arr[0].metal)
+                };
+                item.sell = {
+                    keys: arr[0].keys,
+                    metal: Methods.getRight(arr[0].metal + minSellMargin)
+                };
+            } else {
+                item.buy = {
+                    keys: arr[0].keys,
+                    metal: Methods.getRight(arr[0].metal)
+                };
+                item.sell = {
+                    keys: arr[1].keys,
+                    metal: Methods.getRight(arr[1].metal)
+                };
+            }
 
             // Clamp prices to bounds if set
             const bounds = itemBounds.get(name) || {};
