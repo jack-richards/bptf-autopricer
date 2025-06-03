@@ -64,6 +64,7 @@ module.exports = function (app, config) {
           profileUrl,
           name,
           time,
+          timestamp: timestamp.getTime(), // Add this line
           accepted,
           itemsOur,
           itemsTheir,
@@ -74,7 +75,7 @@ module.exports = function (app, config) {
           reason: trade.action?.reason || '',
           status: statusFlags.join('<br>') || '⚠️ Unmarked'
         };
-      }).sort((a, b) => b.time.localeCompare(a.time));
+      }).sort((a, b) => b.timestamp - a.timestamp); // Sort by timestamp, descending
     } catch (e) {
       console.error('Error loading polldata:', e);
       return res.status(500).send('Failed to load trade history');
