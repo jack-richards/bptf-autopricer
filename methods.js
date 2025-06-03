@@ -39,6 +39,11 @@ Methods.prototype.getRight = function(v) {
 
 // This method ensures we make prices that take into account the current price of the key.
 Methods.prototype.parsePrice = function(original, keyPrice) {
+    // Defensive: ensure keys is always an integer
+    if (!Number.isInteger(original.keys)) {
+        console.error('parsePrice called with non-integer keys:', original);
+        original.keys = Math.trunc(original.keys);
+    }
     var metal = this.getRight(original.keys * keyPrice) + original.metal;
     return {
         keys: Math.trunc(metal / keyPrice),
