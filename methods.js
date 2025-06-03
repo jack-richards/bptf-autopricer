@@ -191,48 +191,44 @@ const comparePrices = (item1, item2) => {
 
 Methods.prototype.addToPricelist = function(item, PRICELIST_PATH) {
     try {
-    lock.acquire('pricelist', () => {
-        const data = fs.readFileSync(PRICELIST_PATH, 'utf8');
+        lock.acquire('pricelist', () => {
+            const data = fs.readFileSync(PRICELIST_PATH, 'utf8');
+            let existingData = JSON.parse(data);
+            let items = Array.isArray(existingData.items) ? existingData.items : [];
 
-        // Parse the existing JSON content into a JavaScript object
-        let existingData = JSON.parse(data);
-        let items = existingData.items;
+            // Filter out empty or malformed items
+            items = items.filter(i => i && i.name && i.sku && i.buy && i.sell);
 
-        // Ensure the existing data is an array (if it's not, create an array)
-        if (!Array.isArray(existingData.items)) {
-            items = [];
-        }
-
-        const existingIndex = items.findIndex(pricelist_item => pricelist_item.sku === item.sku);
-
-        if (existingIndex !== -1) {
-            let pl_item = items[existingIndex];
-            if (item.buy && item.sell && pl_item.buy && pl_item.sell) {
-                if (comparePrices(pl_item.buy, item.buy) && comparePrices(pl_item.sell, item.sell)) {
-                    // Prices are the same, no need to update.
-                    return;
-                } else {
-                    // Prices are different, update.
-                    items[existingIndex] = item;
-                }
-            } else if (item.buy && item.sell && (!pl_item.buy || !pl_item.sell)) {
-                // We have a buy and sell price, but the pricelist item doesn't.
-                items[existingIndex] = item;
-            } else {
-                // Data is missing, don't update.
+            // Validate new item
+            if (!item || !item.name || !item.sku || !item.buy || !item.sell) {
+                console.error('Attempted to add malformed item to pricelist:', item);
                 return;
             }
-        } else {
-            // If the item doesn't exist, add it to the end of the array
-            items.push(item);
-        }
 
-        // Stringify the updated data back to JSON
-        const updatedData = JSON.stringify(existingData, null, 2); // 2 is for indentation
+            // Sanity check: prevent absurd prices
+            if (
+                item.sell.keys > 100 || item.buy.keys > 100 ||
+                item.sell.metal > 1000 || item.buy.metal > 1000
+            ) {
+                console.error(`[ERROR] Abnormal price for ${item.name}:`, item);
+                return;
+            }
 
-        // Write the updated JSON back to the file synchronously
-        fs.writeFileSync(PRICELIST_PATH, updatedData, 'utf8');
-    });
+            const existingIndex = items.findIndex(pricelist_item => pricelist_item.sku === item.sku);
+
+            if (existingIndex !== -1) {
+                items[existingIndex] = item;
+            } else {
+                items.push(item);
+            }
+
+            existingData.items = items;
+
+            // Atomic write
+            const tempPath = PRICELIST_PATH + '.tmp';
+            fs.writeFileSync(tempPath, JSON.stringify(existingData, null, 2), 'utf8');
+            fs.renameSync(tempPath, PRICELIST_PATH);
+        });
     } catch (error) {
         console.error('Error:', error);
     }
