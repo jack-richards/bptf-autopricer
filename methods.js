@@ -207,7 +207,6 @@ Methods.prototype.addToPricelist = function(item, PRICELIST_PATH) {
 
             // Sanity check: prevent absurd prices
             if (
-                item.sell.keys > 100 || item.buy.keys > 100 ||
                 item.sell.metal > 1000 || item.buy.metal > 1000
             ) {
                 console.error(`[ERROR] Abnormal price for ${item.name}:`, item);
