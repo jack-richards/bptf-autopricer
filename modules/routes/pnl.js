@@ -25,26 +25,35 @@ module.exports = function (app, config) {
     const profitPoints = [];
     let totalProfit = 0;
 
+    // Sort history by timestamp ascending
+    history.sort((a, b) => {
+      let ta = a.time || a.actionTimestamp;
+      let tb = b.time || b.actionTimestamp;
+      if (typeof ta === 'number' && ta < 1e12) ta *= 1000;
+      if (typeof tb === 'number' && tb < 1e12) tb *= 1000;
+      return (ta || 0) - (tb || 0);
+    });
+
+    let lastTimestamp = 0;
     for (const t of history) {
+      let timestamp = t.time || t.actionTimestamp;
+      if (typeof timestamp === 'number' && timestamp < 1e12) timestamp *= 1000;
+      if (!timestamp || isNaN(timestamp)) continue; // skip if missing
+
+      // Ensure strictly increasing timestamps
+      if (timestamp <= lastTimestamp) timestamp = lastTimestamp + 1;
+      lastTimestamp = timestamp;
+
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) continue;
+
+      const timeISO = date.toISOString();
+
       const skuList = Object.entries(t.dict?.our || {}).concat(Object.entries(t.dict?.their || {}));
       const valueOur = t.value?.our || { keys: 0, metal: 0 };
       const valueTheir = t.value?.their || { keys: 0, metal: 0 };
       const profit = (valueTheir.keys * keyPrice + valueTheir.metal) - (valueOur.keys * keyPrice + valueOur.metal);
       totalProfit += profit;
-
-      let timestamp = t.time || t.actionTimestamp || Date.now();
-
-      // Fix: Convert from seconds to ms if it's a 10-digit number (Unix time)
-      // Otherwise treat as ISO or already ms
-      if (typeof timestamp === 'number' && timestamp < 1e12) {
-        timestamp *= 1000;
-      }
-
-      const date = new Date(timestamp);
-      if (isNaN(date.getTime())) continue; // Skip bad timestamp
-
-      const timeISO = date.toISOString();
-
 
       profitPoints.push({ x: timeISO, y: parseFloat(totalProfit.toFixed(2)) });
 
