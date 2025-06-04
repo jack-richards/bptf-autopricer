@@ -15,6 +15,7 @@ const PRICELIST_PATH = './files/pricelist.json';
 const ITEM_LIST_PATH = './files/item_list.json';
 const { listen, socketIO } = require('./API/server.js');
 const { startPriceWatcher } = require('./modules/index');
+const scheduleTasks = require('./modules/scheduler');
 const {
     sendPriceAlert,
     cleanupOldKeyPrices,
@@ -57,25 +58,8 @@ const blockedAttributes = config.blockedAttributes;
 const fallbackOntoPricesTf = config.fallbackOntoPricesTf;
 
 // Create database instance for pg-promise.
-const pgp = require('pg-promise')({
-    schema: config.database.schema
-});
-
-// Create a database instance
-const cn = {
-    host: config.database.host,
-    port: config.database.port,
-    database: config.database.name,
-    user: config.database.user,
-    password: config.database.password
-};
-
-const db = pgp(cn);
-
-// ColumnSet object for insert queries.
-const cs = new pgp.helpers.ColumnSet(['name', 'sku', 'currencies', 'intent', 'updated', 'steamid'], {
-    table: 'listings'
-});
+const createDb = require('./modules/db');
+const { db, pgp, cs } = createDb(config);
 
 if (fs.existsSync(SCHEMA_PATH)) {
     // A cached schema exists.
@@ -161,47 +145,17 @@ const { initBptfWebSocket } = require('./websocket/bptfWebSocket');
 let allowedItemNames = new Set();
 let itemBounds = new Map(); // name -> {minBuy, maxBuy, minSell, maxSell}
 
-const loadNames = () => {
-    try {
-        const jsonContent = JSON.parse(fs.readFileSync(ITEM_LIST_PATH, 'utf8'));
-        if (jsonContent && jsonContent.items && Array.isArray(jsonContent.items)) {
-            allowedItemNames = new Set(jsonContent.items.map(item => item.name));
-            itemBounds = new Map();
-            for (const item of jsonContent.items) {
-                itemBounds.set(item.name, {
-                    minBuyKeys: typeof item.minBuyKeys === 'number' ? item.minBuyKeys : undefined,
-                    minBuyMetal: typeof item.minBuyMetal === 'number' ? item.minBuyMetal : undefined,
-                    maxBuyKeys: typeof item.maxBuyKeys === 'number' ? item.maxBuyKeys : undefined,
-                    maxBuyMetal: typeof item.maxBuyMetal === 'number' ? item.maxBuyMetal : undefined,
-                    minSellKeys: typeof item.minSellKeys === 'number' ? item.minSellKeys : undefined,
-                    minSellMetal: typeof item.minSellMetal === 'number' ? item.minSellMetal : undefined,
-                    maxSellKeys: typeof item.maxSellKeys === 'number' ? item.maxSellKeys : undefined,
-                    maxSellMetal: typeof item.maxSellMetal === 'number' ? item.maxSellMetal : undefined
-                });
-            }
-            console.log('Updated allowed item names and bounds.');
-        }
-    } catch (error) {
-        console.error('Error reading and updating allowed item names', error);
-    }
-};
-
-loadNames();
-
-// Watch the JSON file for changes
-const watcher = chokidar.watch(ITEM_LIST_PATH);
-
-// When the JSON file changes, re-read and update the Set of item names.
-watcher.on('change', path => {
-    loadNames();
-});
+const createItemListManager = require('./modules/itemList');
+const itemListManager = createItemListManager(ITEM_LIST_PATH);
+const { loadNames, watchItemList, getAllowedItemNames, getItemBounds } = itemListManager;
+watchItemList();
 
 const calculateAndEmitPrices = async () => {
     // Delete old listings from database.
     await deleteOldListings(db);
     // If the allowedItemNames is empty, we skip the pricing process.
     let item_objects = [];
-    for (const name of allowedItemNames) {
+    for (const name of getAllowedItemNames()) {
         try {
             // Get sku of item via the item name.
             let sku = schemaManager.schema.getSkuFromName(name);
@@ -248,11 +202,9 @@ const calculateAndEmitPrices = async () => {
 
 // When the schema manager is ready we proceed.
 schemaManager.init(async function(err) {
-    if (err) {
-        throw err;
-    }
-	
-	// Start watching pricelist.json for “old” entries
+    if (err) throw err;
+
+    // Start watching pricelist.json for “old” entries
     // pricelist.json lives in ./files/pricelist.json relative to this file:
     const pricelistPath = path.resolve(__dirname, './files/pricelist.json');
     // You can pass a custom ageThresholdSec (default is 2*3600) and intervalSec (default is 300)
@@ -279,41 +231,28 @@ schemaManager.init(async function(err) {
         socketIO
     });
     
-    // Set-up timers for updating key-object, external pricelist and creating prices from listing data.
-    // Get external pricelist every 30 mins.
-    setInterval(async () => {
-        try {
-            external_pricelist = await Methods.getExternalPricelist();
-        } catch (e) {
-            console.error(e);
-        }
-    }, 30 * 60 * 1000);
+    // Start scheduled tasks after everything is ready
+    scheduleTasks({
+        updateExternalPricelist: async () => { external_pricelist = await Methods.getExternalPricelist(); },
+        calculateAndEmitPrices,
+        cleanupOldKeyPrices: async (db) => { await cleanupOldKeyPrices(db); },
+        checkKeyPriceStability: async () => {
+            await checkKeyPriceStability({
+                db,
+                Methods,
+                keyobj,
+                adjustPrice,
+                sendPriceAlert,
+                PRICELIST_PATH,
+                socketIO
+            });
+        },
+        updateMovingAverages: async (db, pgp) => { await updateMovingAverages(db, pgp); },
+        db,
+        pgp
+    });
 
-    // Calculate prices using listing data every 15 minutes.
-    setInterval(async () => {
-        await calculateAndEmitPrices();
-    }, 15 * 60 * 1000); // Every 15 minutes.
-
-    setInterval(async () => {
-        await cleanupOldKeyPrices(db);
-    }, 30 * 60 * 1000); // Cleanup old key prices every 30 minutes (more than 3 days old)
-    
-    setInterval(async () => {
-        await checkKeyPriceStability({
-            db,
-            Methods,
-            keyobj,
-            adjustPrice,
-            sendPriceAlert,
-            PRICELIST_PATH,
-            socketIO
-        });
-    }, 30 * 60 * 1000); // Check key price stability every 30 minutes
-
-    // Schedule every 15 minutes
-    setInterval(async () => { await updateMovingAverages(db, pgp); }, 15 * 60 * 1000);
-	
-	startPriceWatcher(); //start webpage for price watching 
+    startPriceWatcher();
 });
 
 async function isPriceSwingAcceptable(prev, next, sku) {
@@ -650,7 +589,7 @@ const finalisePrice = async (arr, name, sku) => {
             }
 
             // Clamp prices to bounds if set
-            const bounds = itemBounds.get(name) || {};
+            const bounds = getItemBounds().get(name) || {};
             // Clamp buy keys
             if (typeof bounds.minBuyKeys === 'number' && arr[0].keys < bounds.minBuyKeys) arr[0].keys = bounds.minBuyKeys;
             if (typeof bounds.maxBuyKeys === 'number' && arr[0].keys > bounds.maxBuyKeys) arr[0].keys = bounds.maxBuyKeys;
@@ -700,7 +639,7 @@ const finalisePrice = async (arr, name, sku) => {
 
 // Initialize the websocket and pass in dependencies
 const rws = initBptfWebSocket({
-    getAllowedItemNames: () => allowedItemNames,
+    getAllowedItemNames,
     schemaManager,
     Methods,
     insertListing: (...args) => insertListing(db, updateListingStats, ...args),
