@@ -316,13 +316,51 @@ pm2 start bptf-autopricer.js --name bptf-autopricer
 Web Interface
 -------------
 
--   Navigate to `http://localhost:<pricerConfig.port>` (default 3000)
+The bliss-autopricer includes a built-in web dashboard for managing and monitoring your pricing bot. This interface is available at `http://localhost:<pricerConfig.port>` (default: 3000).
 
--   View lists of **Outdated**, **Current**, and **Unpriced** items
+### Main Features
 
--   Add/Remove items to your TF2Autobot selling pricelist
+- **Dashboard Overview**
+  - View and filter items by status: **Outdated**, **Current**, and **Unpriced**.
+  - Outdated items are color-coded by how long their price has not been updated (e.g., ≥2h, ≥24h, ≥72h).
+  - Search and filter items by name or pricelist status.
 
--   Pending actions are queued and when accepted a restart of your bot via PM2
+- **Pricelist Management**
+  - Add new items to be auto-priced by entering their name.
+  - Remove items from the auto-pricer.
+  - Edit min/max buy/sell bounds for each item directly in the table.
+  - All add/remove/edit actions are queued for review before being applied.
+
+- **Queue System**
+  - Pending actions (add, remove, edit) are shown in a queue panel.
+  - Click "Apply & Restart" to apply all queued changes and automatically restart your TF2Autobot process via PM2.
+
+- **Navigation Bar**
+  - **Price List:** Main dashboard for item status and actions.
+  - **Edit Bounds:** Adjust min/max buy/sell bounds for tracked items.
+  - **Key Graph:** Visualize key price history.
+  - **Profit/Loss:** View profit over time and trade summaries.
+  - **Trade History:** Inspect past trades with details and filtering.
+  - **Logs:** View recent output and error logs from the bot process.
+
+### How to Use
+
+1. **Start the pricer** (see "Running" section above).
+2. **Open your browser** to `http://localhost:<pricerConfig.port>`.
+3. **Interact with the dashboard:**
+   - Use search and filter controls to find items.
+   - Add new items using the "Add New Item" form.
+   - Remove or edit items using action buttons in the table.
+   - Review pending actions in the queue panel and click "Apply & Restart" to commit changes.
+4. **Explore additional pages** using the navigation bar for bounds editing, key price graphs, profit/loss, trade history, and logs.
+
+### Notes
+
+- All changes to your bot’s pricelist are applied atomically and will trigger a PM2 restart of your TF2Autobot process for changes to take effect.
+- The web interface reads and writes to `files/item_list.json` and your bot’s `pricelist.json` as configured in `pricerConfig.json`.
+- Outdated prices are detected using the `ageThresholdSec` setting in `pricerConfig.json`.
+
+---
 
 FAQ
 ---
