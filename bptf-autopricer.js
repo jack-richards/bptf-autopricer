@@ -11,11 +11,13 @@ const config = validateConfig(CONFIG_PATH);
 const PriceWatcher = require('./modules/PriceWatcher'); //outdated price logging
 const Schema = require('@tf2autobot/tf2-schema');
 const SCHEMA_PATH = './schema.json';
+// Paths to the pricelist and item list files.
 const PRICELIST_PATH = './files/pricelist.json';
 const ITEM_LIST_PATH = './files/item_list.json';
 const { listen, socketIO } = require('./API/server.js');
 const { startPriceWatcher } = require('./modules/index');
 const scheduleTasks = require('./modules/scheduler');
+
 const {
     sendPriceAlert,
     cleanupOldKeyPrices,
@@ -23,11 +25,13 @@ const {
     adjustPrice,
     checkKeyPriceStability
 } = require('./modules/keyPriceUtils');
+
 const {
     updateMovingAverages,
     updateListingStats,
     initializeListingStats
 } = require('./modules/listingAverages');
+
 const {
     getListings,
     insertListing,
@@ -142,9 +146,7 @@ const updateKeyObject = async () => {
 
 const { initBptfWebSocket } = require('./websocket/bptfWebSocket');
 
-let allowedItemNames = new Set();
-let itemBounds = new Map(); // name -> {minBuy, maxBuy, minSell, maxSell}
-
+// Load item names and bounds from item_list.json
 const createItemListManager = require('./modules/itemList');
 const itemListManager = createItemListManager(ITEM_LIST_PATH);
 const { loadNames, watchItemList, getAllowedItemNames, getItemBounds } = itemListManager;
@@ -383,6 +385,7 @@ const determinePrice = async (name, sku) => {
     });
 
     try {
+        // If the buyFiltered or sellFiltered arrays are empty, we throw an error.
         let arr = getAverages(name, buyFiltered, sellFiltered, sku, pricetfItem);
         return arr;
     } catch (e) {
@@ -390,7 +393,12 @@ const determinePrice = async (name, sku) => {
     }
 };
 
+// Function to calculate the Z-score for a given value.
+// The Z-score is a measure of how many standard deviations a value is from the mean.
 const calculateZScore = (value, mean, stdDev) => {
+    if (stdDev === 0) {
+        throw new Error('Standard deviation cannot be zero.');
+    }
     return (value - mean) / stdDev;
 };
 
@@ -447,10 +455,13 @@ const getAverages = (name, buyFiltered, sellFiltered, sku, pricetfItem) => {
                 keys: 0,
                 metal: 0
             };
+            // If there are more than 3 buy listings, we take the first 3 and calculate the mean average price.
             for (var i = 0; i <= 2; i++) {
+                // If the keys or metal value is undefined, we set it to 0.
                 totalValue.keys += Object.is(buyFiltered[i].currencies.keys, undefined) ?
                     0 :
                     buyFiltered[i].currencies.keys;
+                // If the metal value is undefined, we set it to 0.
                 totalValue.metal += Object.is(buyFiltered[i].currencies.metal, undefined) ?
                     0 :
                     buyFiltered[i].currencies.metal;
@@ -527,6 +538,14 @@ const getAverages = (name, buyFiltered, sellFiltered, sku, pricetfItem) => {
     };
 };
 
+function clamp(val, min, max) {
+    // If min is not a number, we don't clamp the value.
+    // If max is not a number, we don't clamp the value.
+    if (typeof min === 'number' && val < min) return min;
+    if (typeof max === 'number' && val > max) return max;
+    return val;
+}
+
 const finalisePrice = async (arr, name, sku) => {
     let item = {};
     try {
@@ -590,18 +609,13 @@ const finalisePrice = async (arr, name, sku) => {
 
             // Clamp prices to bounds if set
             const bounds = getItemBounds().get(name) || {};
-            // Clamp buy keys
-            if (typeof bounds.minBuyKeys === 'number' && arr[0].keys < bounds.minBuyKeys) arr[0].keys = bounds.minBuyKeys;
-            if (typeof bounds.maxBuyKeys === 'number' && arr[0].keys > bounds.maxBuyKeys) arr[0].keys = bounds.maxBuyKeys;
-            // Clamp buy metal
-            if (typeof bounds.minBuyMetal === 'number' && arr[0].metal < bounds.minBuyMetal) arr[0].metal = bounds.minBuyMetal;
-            if (typeof bounds.maxBuyMetal === 'number' && arr[0].metal > bounds.maxBuyMetal) arr[0].metal = bounds.maxBuyMetal;
-            // Clamp sell keys
-            if (typeof bounds.minSellKeys === 'number' && arr[1].keys < bounds.minSellKeys) arr[1].keys = bounds.minSellKeys;
-            if (typeof bounds.maxSellKeys === 'number' && arr[1].keys > bounds.maxSellKeys) arr[1].keys = bounds.maxSellKeys;
-            // Clamp sell metal
-            if (typeof bounds.minSellMetal === 'number' && arr[1].metal < bounds.minSellMetal) arr[1].metal = bounds.minSellMetal;
-            if (typeof bounds.maxSellMetal === 'number' && arr[1].metal > bounds.maxSellMetal) arr[1].metal = bounds.maxSellMetal;
+            // Clamp the buy and sell prices to the bounds set in the config.
+            // If the bounds are not set, it will just use the default values of 0 and Infinity.
+            arr[0].keys  = clamp(arr[0].keys,  bounds.minBuyKeys,  bounds.maxBuyKeys);
+            arr[0].metal = clamp(arr[0].metal, bounds.minBuyMetal, bounds.maxBuyMetal);
+            arr[1].keys  = clamp(arr[1].keys,  bounds.minSellKeys, bounds.maxSellKeys);
+            arr[1].metal = clamp(arr[1].metal, bounds.minSellMetal, bounds.maxSellMetal);
+
 
             // Load previous price from pricelist if available
             const pricelist = JSON.parse(fs.readFileSync(PRICELIST_PATH, 'utf8'));
