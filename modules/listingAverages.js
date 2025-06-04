@@ -78,14 +78,12 @@ async function updateMovingAverages(db, pgp, alpha = 0.35) {
 }
 
 async function updateListingStats(db, sku) {
-    const { count: overallCount } = await db.one(
-        `SELECT COUNT(*) FROM listings WHERE sku = $1`, [sku]
-    );
-    const { count: buyCount } = await db.one(
-        `SELECT COUNT(*) FROM listings WHERE sku = $1 AND intent = 'buy'`, [sku]
-    );
-    const { count: sellCount } = await db.one(
-        `SELECT COUNT(*) FROM listings WHERE sku = $1 AND intent = 'sell'`, [sku]
+    const { overall, buy, sell } = await db.one(
+        `SELECT
+            COUNT(*) AS overall,
+            COUNT(*) FILTER (WHERE intent = 'buy') AS buy,
+            COUNT(*) FILTER (WHERE intent = 'sell') AS sell
+         FROM listings WHERE sku = $1`, [sku]
     );
     await db.none(`
         INSERT INTO listing_stats (sku, current_count, current_buy_count, current_sell_count, last_updated)
@@ -95,7 +93,7 @@ async function updateListingStats(db, sku) {
             current_buy_count = $3,
             current_sell_count = $4,
             last_updated = NOW()
-    `, [sku, overallCount, buyCount, sellCount]);
+    `, [sku, overall, buy, sell]);
 }
 
 async function initializeListingStats(db) {

@@ -27,3 +27,9 @@ CREATE TABLE tf2.listing_stats (
     current_sell_count integer DEFAULT 0,
     moving_avg_sell_count real DEFAULT 0;
 );
+CREATE TABLE tf2.price_history (
+    sku TEXT NOT NULL,
+    buy_metal NUMERIC NOT NULL,
+    sell_metal NUMERIC NOT NULL,
+    timestamp TIMESTAMP NOT NULL DEFAULT NOW()
+);

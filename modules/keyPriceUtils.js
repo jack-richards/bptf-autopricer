@@ -67,11 +67,14 @@ async function adjustPrice({ name, sku, newBuyPrice, newSellPrice, Methods, PRIC
 
 async function checkKeyPriceStability({ db, Methods, keyobj, adjustPrice, sendPriceAlert, socketIO }) {
     const CHANGE_THRESHOLD = 0.33;
+    const STD_THRESHOLD = 0.66; // You can move this to config if you want
     try {
-        const [{ avg_buy: buyA, avg_sell: sellA }] = await db.any(`
+        const [{ avg_buy: buyA, avg_sell: sellA, std_buy: stdBuyA, std_sell: stdSellA }] = await db.any(`
             SELECT
                 AVG(buy_price_metal)::float AS avg_buy,
-                AVG(sell_price_metal)::float AS avg_sell
+                AVG(sell_price_metal)::float AS avg_sell,
+                STDDEV_POP(buy_price_metal)::float AS std_buy,
+                STDDEV_POP(sell_price_metal)::float AS std_sell
             FROM key_prices
             WHERE sku = '5021;6'
               AND created_at BETWEEN NOW() - INTERVAL '3 hours' AND NOW();
@@ -88,6 +91,12 @@ async function checkKeyPriceStability({ db, Methods, keyobj, adjustPrice, sendPr
 
         if (buyA == null || sellA == null || buyB == null || sellB == null) {
             console.log("Not enough data in one of the 3-hour windows—skipping volatility check.");
+            return;
+        }
+
+        // Additional stddev check
+        if (stdSellA > STD_THRESHOLD || stdBuyA > STD_THRESHOLD) {
+            sendPriceAlert(`High key price volatility detected (std sell: ${stdSellA}, std buy: ${stdBuyA})`);
             return;
         }
 

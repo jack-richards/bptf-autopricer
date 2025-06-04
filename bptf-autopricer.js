@@ -5,14 +5,19 @@ const chokidar = require('chokidar');
 const methods = require('./methods');
 const Methods = new methods();
 const path = require('path');
+const { validateConfig } = require('./modules/configValidation');
+const CONFIG_PATH = path.resolve(__dirname, 'config.json');
+const config = validateConfig(CONFIG_PATH);
 const PriceWatcher = require('./modules/PriceWatcher'); //outdated price logging
 const Schema = require('@tf2autobot/tf2-schema');
-const config = require('./config.json');
 const SCHEMA_PATH = './schema.json';
+// Paths to the pricelist and item list files.
 const PRICELIST_PATH = './files/pricelist.json';
 const ITEM_LIST_PATH = './files/item_list.json';
 const { listen, socketIO } = require('./API/server.js');
 const { startPriceWatcher } = require('./modules/index');
+const scheduleTasks = require('./modules/scheduler');
+
 const {
     sendPriceAlert,
     cleanupOldKeyPrices,
@@ -20,11 +25,13 @@ const {
     adjustPrice,
     checkKeyPriceStability
 } = require('./modules/keyPriceUtils');
+
 const {
     updateMovingAverages,
     updateListingStats,
     initializeListingStats
 } = require('./modules/listingAverages');
+
 const {
     getListings,
     insertListing,
@@ -55,25 +62,8 @@ const blockedAttributes = config.blockedAttributes;
 const fallbackOntoPricesTf = config.fallbackOntoPricesTf;
 
 // Create database instance for pg-promise.
-const pgp = require('pg-promise')({
-    schema: config.database.schema
-});
-
-// Create a database instance
-const cn = {
-    host: config.database.host,
-    port: config.database.port,
-    database: config.database.name,
-    user: config.database.user,
-    password: config.database.password
-};
-
-const db = pgp(cn);
-
-// ColumnSet object for insert queries.
-const cs = new pgp.helpers.ColumnSet(['name', 'sku', 'currencies', 'intent', 'updated', 'steamid'], {
-    table: 'listings'
-});
+const createDb = require('./modules/db');
+const { db, pgp, cs } = createDb(config);
 
 if (fs.existsSync(SCHEMA_PATH)) {
     // A cached schema exists.
@@ -156,56 +146,24 @@ const updateKeyObject = async () => {
 
 const { initBptfWebSocket } = require('./websocket/bptfWebSocket');
 
-let allowedItemNames = new Set();
-let itemBounds = new Map(); // name -> {minBuy, maxBuy, minSell, maxSell}
-
-const loadNames = () => {
-    try {
-        const jsonContent = JSON.parse(fs.readFileSync(ITEM_LIST_PATH, 'utf8'));
-        if (jsonContent && jsonContent.items && Array.isArray(jsonContent.items)) {
-            allowedItemNames = new Set(jsonContent.items.map(item => item.name));
-            itemBounds = new Map();
-            for (const item of jsonContent.items) {
-                itemBounds.set(item.name, {
-                    minBuyKeys: typeof item.minBuyKeys === 'number' ? item.minBuyKeys : undefined,
-                    minBuyMetal: typeof item.minBuyMetal === 'number' ? item.minBuyMetal : undefined,
-                    maxBuyKeys: typeof item.maxBuyKeys === 'number' ? item.maxBuyKeys : undefined,
-                    maxBuyMetal: typeof item.maxBuyMetal === 'number' ? item.maxBuyMetal : undefined,
-                    minSellKeys: typeof item.minSellKeys === 'number' ? item.minSellKeys : undefined,
-                    minSellMetal: typeof item.minSellMetal === 'number' ? item.minSellMetal : undefined,
-                    maxSellKeys: typeof item.maxSellKeys === 'number' ? item.maxSellKeys : undefined,
-                    maxSellMetal: typeof item.maxSellMetal === 'number' ? item.maxSellMetal : undefined
-                });
-            }
-            console.log('Updated allowed item names and bounds.');
-        }
-    } catch (error) {
-        console.error('Error reading and updating allowed item names', error);
-    }
-};
-
-loadNames();
-
-// Watch the JSON file for changes
-const watcher = chokidar.watch(ITEM_LIST_PATH);
-
-// When the JSON file changes, re-read and update the Set of item names.
-watcher.on('change', path => {
-    loadNames();
-});
+// Load item names and bounds from item_list.json
+const createItemListManager = require('./modules/itemList');
+const itemListManager = createItemListManager(ITEM_LIST_PATH);
+const { loadNames, watchItemList, getAllowedItemNames, getItemBounds } = itemListManager;
+watchItemList();
 
 const calculateAndEmitPrices = async () => {
     // Delete old listings from database.
     await deleteOldListings(db);
     // If the allowedItemNames is empty, we skip the pricing process.
     let item_objects = [];
-    for (const name of allowedItemNames) {
+    for (const name of getAllowedItemNames()) {
         try {
             // Get sku of item via the item name.
             let sku = schemaManager.schema.getSkuFromName(name);
             // Start process of pricing item.
             let arr = await determinePrice(name, sku);
-            let item = finalisePrice(arr, name, sku);
+            let item = await finalisePrice(arr, name, sku);
             // If the item is undefined, we skip it.
             if (!item) {
                 continue;
@@ -246,11 +204,9 @@ const calculateAndEmitPrices = async () => {
 
 // When the schema manager is ready we proceed.
 schemaManager.init(async function(err) {
-    if (err) {
-        throw err;
-    }
-	
-	// Start watching pricelist.json for “old” entries
+    if (err) throw err;
+
+    // Start watching pricelist.json for “old” entries
     // pricelist.json lives in ./files/pricelist.json relative to this file:
     const pricelistPath = path.resolve(__dirname, './files/pricelist.json');
     // You can pass a custom ageThresholdSec (default is 2*3600) and intervalSec (default is 300)
@@ -277,63 +233,58 @@ schemaManager.init(async function(err) {
         socketIO
     });
     
-    // Set-up timers for updating key-object, external pricelist and creating prices from listing data.
-    // Get external pricelist every 30 mins.
-    setInterval(async () => {
-        try {
-            external_pricelist = await Methods.getExternalPricelist();
-        } catch (e) {
-            console.error(e);
-        }
-    }, 30 * 60 * 1000);
+    // Start scheduled tasks after everything is ready
+    scheduleTasks({
+        updateExternalPricelist: async () => { external_pricelist = await Methods.getExternalPricelist(); },
+        calculateAndEmitPrices,
+        cleanupOldKeyPrices: async (db) => { await cleanupOldKeyPrices(db); },
+        checkKeyPriceStability: async () => {
+            await checkKeyPriceStability({
+                db,
+                Methods,
+                keyobj,
+                adjustPrice,
+                sendPriceAlert,
+                PRICELIST_PATH,
+                socketIO
+            });
+        },
+        updateMovingAverages: async (db, pgp) => { await updateMovingAverages(db, pgp); },
+        db,
+        pgp
+    });
 
-    // Calculate prices using listing data every 15 minutes.
-    setInterval(async () => {
-        await calculateAndEmitPrices();
-    }, 15 * 60 * 1000); // Every 15 minutes.
-
-    setInterval(async () => {
-        await cleanupOldKeyPrices(db);
-    }, 30 * 60 * 1000); // Cleanup old key prices every 30 minutes (more than 3 days old)
-    
-    setInterval(async () => {
-        await checkKeyPriceStability({
-            db,
-            Methods,
-            keyobj,
-            adjustPrice,
-            sendPriceAlert,
-            PRICELIST_PATH,
-            socketIO
-        });
-    }, 30 * 60 * 1000); // Check key price stability every 30 minutes
-
-    // Schedule every 15 minutes
-    setInterval(async () => { await updateMovingAverages(db, pgp); }, 15 * 60 * 1000);
-	
-	startPriceWatcher(); //start webpage for price watching 
+    startPriceWatcher();
 });
 
-function isPriceSwingAcceptable(prev, next) {
-    // Convert to metal for comparison
-    const prevBuy = Methods.toMetal(prev.buy, keyobj.metal);
+async function isPriceSwingAcceptable(prev, next, sku) {
+    // Fetch last 5 prices from DB
+    const history = await db.any(
+        'SELECT buy_metal, sell_metal FROM price_history WHERE sku = $1 ORDER BY timestamp DESC LIMIT 5',
+        [sku]
+    );
+    if (history.length === 0) return true; // No history, allow
+
+    const avgBuy = history.reduce((sum, p) => sum + Number(p.buy_metal), 0) / history.length;
+    const avgSell = history.reduce((sum, p) => sum + Number(p.sell_metal), 0) / history.length;
+
     const nextBuy = Methods.toMetal(next.buy, keyobj.metal);
-    const prevSell = Methods.toMetal(prev.sell, keyobj.metal);
     const nextSell = Methods.toMetal(next.sell, keyobj.metal);
 
-    // Block buy price increases > 10%
-    if (nextBuy > prevBuy && (nextBuy - prevBuy) / prevBuy > 0.10) {
+    const maxBuyIncrease = config.priceSwingLimits?.maxBuyIncrease ?? 0.10;
+    const maxSellDecrease = config.priceSwingLimits?.maxSellDecrease ?? 0.10;
+
+    if (nextBuy > avgBuy && (nextBuy - avgBuy) / avgBuy > maxBuyIncrease) {
         return false;
     }
-    // Block sell price decreases > 10%
-    if (nextSell < prevSell && (prevSell - nextSell) / prevSell > 0.10) {
+    if (nextSell < avgSell && (avgSell - nextSell) / avgSell > maxSellDecrease) {
         return false;
     }
     return true;
 }
 
 const determinePrice = async (name, sku) => {
-    // Delete listings that are greater than 30 minutes old.
+    // Delete listings based on moving averages.
     await deleteOldListings(db);
 
     var buyListings = await getListings(db, name, 'buy');
@@ -434,6 +385,7 @@ const determinePrice = async (name, sku) => {
     });
 
     try {
+        // If the buyFiltered or sellFiltered arrays are empty, we throw an error.
         let arr = getAverages(name, buyFiltered, sellFiltered, sku, pricetfItem);
         return arr;
     } catch (e) {
@@ -441,7 +393,12 @@ const determinePrice = async (name, sku) => {
     }
 };
 
+// Function to calculate the Z-score for a given value.
+// The Z-score is a measure of how many standard deviations a value is from the mean.
 const calculateZScore = (value, mean, stdDev) => {
+    if (stdDev === 0) {
+        throw new Error('Standard deviation cannot be zero.');
+    }
     return (value - mean) / stdDev;
 };
 
@@ -498,10 +455,13 @@ const getAverages = (name, buyFiltered, sellFiltered, sku, pricetfItem) => {
                 keys: 0,
                 metal: 0
             };
+            // If there are more than 3 buy listings, we take the first 3 and calculate the mean average price.
             for (var i = 0; i <= 2; i++) {
+                // If the keys or metal value is undefined, we set it to 0.
                 totalValue.keys += Object.is(buyFiltered[i].currencies.keys, undefined) ?
                     0 :
                     buyFiltered[i].currencies.keys;
+                // If the metal value is undefined, we set it to 0.
                 totalValue.metal += Object.is(buyFiltered[i].currencies.metal, undefined) ?
                     0 :
                     buyFiltered[i].currencies.metal;
@@ -578,7 +538,15 @@ const getAverages = (name, buyFiltered, sellFiltered, sku, pricetfItem) => {
     };
 };
 
-const finalisePrice = (arr, name, sku) => {
+function clamp(val, min, max) {
+    // If min is not a number, we don't clamp the value.
+    // If max is not a number, we don't clamp the value.
+    if (typeof min === 'number' && val < min) return min;
+    if (typeof max === 'number' && val > max) return max;
+    return val;
+}
+
+const finalisePrice = async (arr, name, sku) => {
     let item = {};
     try {
         if (!arr) {
@@ -614,18 +582,11 @@ const finalisePrice = (arr, name, sku) => {
             arr[0] = Methods.parsePrice(arr[0], keyobj.metal);
             arr[1] = Methods.parsePrice(arr[1], keyobj.metal);
 
-            // Calculates the pure value of the keys involved and adds it to the pure metal.
-            // We use this to easily compare the listing 'costs' shortly.
+            // Enforce minSellMargin from config
+            const minSellMargin = config.minSellMargin ?? 0.11;
             var buyInMetal = Methods.toMetal(arr[0], keyobj.metal);
             var sellInMetal = Methods.toMetal(arr[1], keyobj.metal);
 
-            // If the buy price in metal for the listing is greater than or equal to the sell price
-            // we ensure the metal is in the correct format again, and we re-use the already validated
-            // key price.
-
-            // The main point here is that we use the buy price as the selling price, adding 0.11 as a margin.
-            // This way if the buy price turns out to be higher than our averaged selling price, we don't
-            // get screwed in this respect.
             if (buyInMetal >= sellInMetal) {
                 item.buy = {
                     keys: arr[0].keys,
@@ -633,11 +594,9 @@ const finalisePrice = (arr, name, sku) => {
                 };
                 item.sell = {
                     keys: arr[0].keys,
-                    metal: Methods.getRight(arr[0].metal + 0.11)
+                    metal: Methods.getRight(arr[0].metal + minSellMargin)
                 };
             } else {
-                // If the buy price is less than our selling price, we just
-                // use them as expected, sell price for sell, buy for buy.
                 item.buy = {
                     keys: arr[0].keys,
                     metal: Methods.getRight(arr[0].metal)
@@ -647,20 +606,16 @@ const finalisePrice = (arr, name, sku) => {
                     metal: Methods.getRight(arr[1].metal)
                 };
             }
+
             // Clamp prices to bounds if set
-            const bounds = itemBounds.get(name) || {};
-            // Clamp buy keys
-            if (typeof bounds.minBuyKeys === 'number' && arr[0].keys < bounds.minBuyKeys) arr[0].keys = bounds.minBuyKeys;
-            if (typeof bounds.maxBuyKeys === 'number' && arr[0].keys > bounds.maxBuyKeys) arr[0].keys = bounds.maxBuyKeys;
-            // Clamp buy metal
-            if (typeof bounds.minBuyMetal === 'number' && arr[0].metal < bounds.minBuyMetal) arr[0].metal = bounds.minBuyMetal;
-            if (typeof bounds.maxBuyMetal === 'number' && arr[0].metal > bounds.maxBuyMetal) arr[0].metal = bounds.maxBuyMetal;
-            // Clamp sell keys
-            if (typeof bounds.minSellKeys === 'number' && arr[1].keys < bounds.minSellKeys) arr[1].keys = bounds.minSellKeys;
-            if (typeof bounds.maxSellKeys === 'number' && arr[1].keys > bounds.maxSellKeys) arr[1].keys = bounds.maxSellKeys;
-            // Clamp sell metal
-            if (typeof bounds.minSellMetal === 'number' && arr[1].metal < bounds.minSellMetal) arr[1].metal = bounds.minSellMetal;
-            if (typeof bounds.maxSellMetal === 'number' && arr[1].metal > bounds.maxSellMetal) arr[1].metal = bounds.maxSellMetal;
+            const bounds = getItemBounds().get(name) || {};
+            // Clamp the buy and sell prices to the bounds set in the config.
+            // If the bounds are not set, it will just use the default values of 0 and Infinity.
+            arr[0].keys  = clamp(arr[0].keys,  bounds.minBuyKeys,  bounds.maxBuyKeys);
+            arr[0].metal = clamp(arr[0].metal, bounds.minBuyMetal, bounds.maxBuyMetal);
+            arr[1].keys  = clamp(arr[1].keys,  bounds.minSellKeys, bounds.maxSellKeys);
+            arr[1].metal = clamp(arr[1].metal, bounds.minSellMetal, bounds.maxSellMetal);
+
 
             // Load previous price from pricelist if available
             const pricelist = JSON.parse(fs.readFileSync(PRICELIST_PATH, 'utf8'));
@@ -670,11 +625,22 @@ const finalisePrice = (arr, name, sku) => {
             if (prev) {
                 const prevObj = { buy: prev.buy, sell: prev.sell };
                 const nextObj = { buy: item.buy, sell: item.sell };
-                if (!isPriceSwingAcceptable(prevObj, nextObj)) {
+                const swingOk = await isPriceSwingAcceptable(prevObj, nextObj, sku);
+                if (!swingOk) {
                     console.log(`Price swing too large for ${name} (${sku}), skipping update.`);
-                    return; // Drop the price update
+                    return;
                 }
             }
+
+            // Save to price history
+            await db.none(
+                'INSERT INTO price_history (sku, buy_metal, sell_metal, timestamp) VALUES ($1, $2, $3, NOW())',
+                [
+                    sku,
+                    Methods.toMetal(item.buy, keyobj.metal),
+                    Methods.toMetal(item.sell, keyobj.metal)
+                ]
+            );
 
             // Return the new item object with the latest price.
             return item;
@@ -687,7 +653,7 @@ const finalisePrice = (arr, name, sku) => {
 
 // Initialize the websocket and pass in dependencies
 const rws = initBptfWebSocket({
-    getAllowedItemNames: () => allowedItemNames,
+    getAllowedItemNames,
     schemaManager,
     Methods,
     insertListing: (...args) => insertListing(db, updateListingStats, ...args),
