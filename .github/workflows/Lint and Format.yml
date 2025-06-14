@@ -38,6 +38,7 @@ jobs:
           commit_user_name: github-actions
           commit_user_email: github-actions@github.com
           commit_author: github-actions <github-actions@github.com>
+          file_pattern: ':!**/.github/workflows/*'
 
       - name: Run Super-Linter
         uses: github/super-linter@v4
