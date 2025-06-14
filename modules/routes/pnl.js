@@ -39,23 +39,35 @@ module.exports = function (app, config) {
     history.sort((a, b) => {
       let ta = a.time || a.actionTimestamp;
       let tb = b.time || b.actionTimestamp;
-      if (typeof ta === 'number' && ta < 1e12) {ta *= 1000;}
-      if (typeof tb === 'number' && tb < 1e12) {tb *= 1000;}
+      if (typeof ta === 'number' && ta < 1e12) {
+        ta *= 1000;
+      }
+      if (typeof tb === 'number' && tb < 1e12) {
+        tb *= 1000;
+      }
       return (ta || 0) - (tb || 0);
     });
 
     let lastTimestamp = 0;
     for (const t of history) {
       let timestamp = t.time || t.actionTimestamp;
-      if (typeof timestamp === 'number' && timestamp < 1e12) {timestamp *= 1000;}
-      if (!timestamp || isNaN(timestamp)) {continue;} // skip if missing
+      if (typeof timestamp === 'number' && timestamp < 1e12) {
+        timestamp *= 1000;
+      }
+      if (!timestamp || isNaN(timestamp)) {
+        continue;
+      } // skip if missing
 
       // Ensure strictly increasing timestamps
-      if (timestamp <= lastTimestamp) {timestamp = lastTimestamp + 1;}
+      if (timestamp <= lastTimestamp) {
+        timestamp = lastTimestamp + 1;
+      }
       lastTimestamp = timestamp;
 
       const date = new Date(timestamp);
-      if (isNaN(date.getTime())) {continue;}
+      if (isNaN(date.getTime())) {
+        continue;
+      }
 
       const timeISO = date.toISOString();
 
@@ -73,7 +85,9 @@ module.exports = function (app, config) {
       profitPoints.push({ x: timeISO, y: parseFloat(totalProfit.toFixed(2)) });
 
       for (const [sku, qty] of skuList) {
-        if (!summary[sku]) {summary[sku] = { qty: 0, profit: 0 };}
+        if (!summary[sku]) {
+          summary[sku] = { qty: 0, profit: 0 };
+        }
         summary[sku].qty += qty;
         summary[sku].profit += profit;
       }

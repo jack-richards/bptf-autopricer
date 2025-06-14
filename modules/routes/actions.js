@@ -41,8 +41,11 @@ module.exports = function (app, config) {
         };
         saveJson(sellingPricelistPath, sell);
         exec(`pm2 restart ${config.pm2ProcessName}`, (err, stdout, stderr) => {
-          if (err) {console.error('PM2 restart error:', stderr);}
-          else {console.log('Restarted tf2autobot:', stdout);}
+          if (err) {
+            console.error('PM2 restart error:', stderr);
+          } else {
+            console.log('Restarted tf2autobot:', stdout);
+          }
         });
       }
     }
@@ -56,8 +59,11 @@ module.exports = function (app, config) {
       delete sell[sku];
       saveJson(sellingPricelistPath, sell);
       exec(`pm2 restart ${config.pm2ProcessName}`, (err, stdout, stderr) => {
-        if (err) {console.error('PM2 restart error:', stderr);}
-        else {console.log('Restarted tf2autobot:', stdout);}
+        if (err) {
+          console.error('PM2 restart error:', stderr);
+        } else {
+          console.log('Restarted tf2autobot:', stdout);
+        }
       });
     }
     res.redirect('back');
@@ -65,7 +71,9 @@ module.exports = function (app, config) {
 
   app.post('/add-item', (req, res) => {
     const { name } = req.body;
-    if (!name) {return res.redirect('back');}
+    if (!name) {
+      return res.redirect('back');
+    }
 
     const itemList = loadJson(itemListPath);
     if (!itemList.items.some((i) => i.name === name)) {
@@ -81,11 +89,14 @@ module.exports = function (app, config) {
 
   app.post('/bot/edit', (req, res) => {
     const { sku, min, max } = req.body;
-    if (!sku || isNaN(min) || isNaN(max))
-    {return res.status(400).send('Invalid edit');}
+    if (!sku || isNaN(min) || isNaN(max)) {
+      return res.status(400).send('Invalid edit');
+    }
 
     const pricelist = loadJson(sellingPricelistPath);
-    if (!pricelist[sku]) {return res.status(404).send('Item not found');}
+    if (!pricelist[sku]) {
+      return res.status(404).send('Item not found');
+    }
 
     pricelist[sku].min = parseInt(min);
     pricelist[sku].max = parseInt(max);
@@ -94,8 +105,11 @@ module.exports = function (app, config) {
 
     // Optional: trigger PM2 restart
     exec('pm2 restart tf2autobot', (err, stdout, stderr) => {
-      if (err) {console.error('PM2 restart error:', stderr);}
-      else {console.log('Bot restarted after edit:', stdout);}
+      if (err) {
+        console.error('PM2 restart error:', stderr);
+      } else {
+        console.log('Bot restarted after edit:', stdout);
+      }
     });
 
     res.send('Updated');

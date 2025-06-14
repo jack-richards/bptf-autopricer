@@ -51,8 +51,12 @@ function initBptfWebSocket({
           let listingDetails = e.payload.details;
           let listingItemObject = e.payload.item;
 
-          if (!e.payload.userAgent) {return;}
-          if (!Methods.validateObject(currencies)) {return;}
+          if (!e.payload.userAgent) {
+            return;
+          }
+          if (!Methods.validateObject(currencies)) {
+            return;
+          }
 
           if (
             listingItemObject.attributes &&
@@ -142,8 +146,11 @@ function initBptfWebSocket({
       let updateCount = 0;
       let deleteCount = 0;
       json.forEach((ev) => {
-        if (ev.event === 'listing-update') {updateCount++;}
-        else if (ev.event === 'listing-delete') {deleteCount++;}
+        if (ev.event === 'listing-update') {
+          updateCount++;
+        } else if (ev.event === 'listing-delete') {
+          deleteCount++;
+        }
       });
       console.log(
         `[WebSocket] Received batch: ${json.length} events (${updateCount} updates, ${deleteCount} deletions)`,

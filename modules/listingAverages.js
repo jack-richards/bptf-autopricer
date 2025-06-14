@@ -8,7 +8,9 @@ async function updateMovingAverages(db, pgp, alpha = 0.35) {
                current_sell_count, moving_avg_sell_count
         FROM listing_stats
     `);
-  if (stats.length === 0) {return;}
+  if (stats.length === 0) {
+    return;
+  }
 
   // clampAndRound ensures all moving averages:
   // - are rounded to 2 decimal places (e.g., 1.2345 -> 1.23)

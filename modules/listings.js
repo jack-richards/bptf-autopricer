@@ -50,7 +50,9 @@ const deleteRemovedListing = async (
     'DELETE FROM listings WHERE steamid = $1 AND name = $2 AND intent = $3;',
     [steamid, name, intent],
   );
-  if (sku) {await updateListingStats(db, sku);}
+  if (sku) {
+    await updateListingStats(db, sku);
+  }
   return result;
 };
 
@@ -79,29 +81,41 @@ const deleteOldListings = async (db) => {
 
   for (const row of stats) {
     // Buy bands
-    if (row.moving_avg_buy_count > 10) {buyBands.veryActive.push(row.sku);}
-    else if (row.moving_avg_buy_count > 8) {buyBands.active.push(row.sku);}
-    else if (row.moving_avg_buy_count > 6)
-    {buyBands.moderatelyActive.push(row.sku);}
-    else if (row.moving_avg_buy_count > 4)
-    {buyBands.somewhatActive.push(row.sku);}
-    else if (row.moving_avg_buy_count > 2) {buyBands.lowActive.push(row.sku);}
-    else {buyBands.rare.push(row.sku);}
+    if (row.moving_avg_buy_count > 10) {
+      buyBands.veryActive.push(row.sku);
+    } else if (row.moving_avg_buy_count > 8) {
+      buyBands.active.push(row.sku);
+    } else if (row.moving_avg_buy_count > 6) {
+      buyBands.moderatelyActive.push(row.sku);
+    } else if (row.moving_avg_buy_count > 4) {
+      buyBands.somewhatActive.push(row.sku);
+    } else if (row.moving_avg_buy_count > 2) {
+      buyBands.lowActive.push(row.sku);
+    } else {
+      buyBands.rare.push(row.sku);
+    }
 
     // Sell bands
-    if (row.moving_avg_sell_count > 10) {sellBands.veryActive.push(row.sku);}
-    else if (row.moving_avg_sell_count > 8) {sellBands.active.push(row.sku);}
-    else if (row.moving_avg_sell_count > 6)
-    {sellBands.moderatelyActive.push(row.sku);}
-    else if (row.moving_avg_sell_count > 4)
-    {sellBands.somewhatActive.push(row.sku);}
-    else if (row.moving_avg_sell_count > 2) {sellBands.lowActive.push(row.sku);}
-    else {sellBands.rare.push(row.sku);}
+    if (row.moving_avg_sell_count > 10) {
+      sellBands.veryActive.push(row.sku);
+    } else if (row.moving_avg_sell_count > 8) {
+      sellBands.active.push(row.sku);
+    } else if (row.moving_avg_sell_count > 6) {
+      sellBands.moderatelyActive.push(row.sku);
+    } else if (row.moving_avg_sell_count > 4) {
+      sellBands.somewhatActive.push(row.sku);
+    } else if (row.moving_avg_sell_count > 2) {
+      sellBands.lowActive.push(row.sku);
+    } else {
+      sellBands.rare.push(row.sku);
+    }
   }
 
   // Now delete buy listings by their bands
   for (const [band, skus] of Object.entries(buyBands)) {
-    if (skus.length === 0) {continue;}
+    if (skus.length === 0) {
+      continue;
+    }
     let age;
     switch (band) {
       case 'veryActive':
@@ -131,7 +145,9 @@ const deleteOldListings = async (db) => {
 
   // Now delete sell listings by their bands
   for (const [band, skus] of Object.entries(sellBands)) {
-    if (skus.length === 0) {continue;}
+    if (skus.length === 0) {
+      continue;
+    }
     let age;
     switch (band) {
       case 'veryActive':

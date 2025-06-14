@@ -38,7 +38,9 @@ function deepMerge(target, src) {
       src[key] !== null &&
       !Array.isArray(src[key])
     ) {
-      if (!target[key]) {target[key] = {};}
+      if (!target[key]) {
+        target[key] = {};
+      }
       deepMerge(target[key], src[key]);
     } else if (target[key] === undefined) {
       target[key] = src[key];

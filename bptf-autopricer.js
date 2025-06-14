@@ -40,7 +40,9 @@ const {
 } = require('./modules/listings');
 const logDir = path.join(__dirname, 'logs');
 const logFile = path.join(logDir, 'websocket.log');
-if (!fs.existsSync(logDir)) {fs.mkdirSync(logDir);}
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir);
+}
 
 // Steam API key is required for the schema manager to work.
 const schemaManager = new Schema({
@@ -212,7 +214,9 @@ const calculateAndEmitPrices = async () => {
 
 // When the schema manager is ready we proceed.
 schemaManager.init(async function (err) {
-  if (err) {throw err;}
+  if (err) {
+    throw err;
+  }
 
   // Start watching pricelist.json for “old” entries
   // pricelist.json lives in ./files/pricelist.json relative to this file:
@@ -277,7 +281,9 @@ async function isPriceSwingAcceptable(prev, next, sku) {
     'SELECT buy_metal, sell_metal FROM price_history WHERE sku = $1 ORDER BY timestamp DESC LIMIT 5',
     [sku],
   );
-  if (history.length === 0) {return true;} // No history, allow
+  if (history.length === 0) {
+    return true;
+  } // No history, allow
 
   const avgBuy =
     history.reduce((sum, p) => sum + Number(p.buy_metal), 0) / history.length;
@@ -586,8 +592,12 @@ const getAverages = (name, buyFiltered, sellFiltered, sku, pricetfItem) => {
 function clamp(val, min, max) {
   // If min is not a number, we don't clamp the value.
   // If max is not a number, we don't clamp the value.
-  if (typeof min === 'number' && val < min) {return min;}
-  if (typeof max === 'number' && val > max) {return max;}
+  if (typeof min === 'number' && val < min) {
+    return min;
+  }
+  if (typeof max === 'number' && val > max) {
+    return max;
+  }
   return val;
 }
 

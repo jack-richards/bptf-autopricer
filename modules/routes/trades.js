@@ -66,12 +66,21 @@ module.exports = function (app, config) {
           }
 
           const statusFlags = [];
-          if (trade.isAccepted) {statusFlags.push('✅ Accepted');}
-          if (trade.isDeclined) {statusFlags.push('❌ Declined');}
-          if (trade.isInvalid) {statusFlags.push('⚠️ Invalid');}
-          if (trade.action?.action?.toLowerCase().includes('counter'))
-          {statusFlags.push('↩️ Countered');}
-          if (trade.action?.action === 'skip') {statusFlags.push('⏭️ Skipped');}
+          if (trade.isAccepted) {
+            statusFlags.push('✅ Accepted');
+          }
+          if (trade.isDeclined) {
+            statusFlags.push('❌ Declined');
+          }
+          if (trade.isInvalid) {
+            statusFlags.push('⚠️ Invalid');
+          }
+          if (trade.action?.action?.toLowerCase().includes('counter')) {
+            statusFlags.push('↩️ Countered');
+          }
+          if (trade.action?.action === 'skip') {
+            statusFlags.push('⏭️ Skipped');
+          }
 
           return {
             id,
