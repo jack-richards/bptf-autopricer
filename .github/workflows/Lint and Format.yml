@@ -22,8 +22,7 @@ jobs:
           node-version: "20"
 
       - name: Install Prettier and ESLint
-        run: |
-          npm install --no-save prettier eslint
+        run: npm install --no-save prettier eslint eslint-config-prettier eslint-plugin-prettier
 
       - name: Prettier Auto-Fix
         run: npx prettier --write .
