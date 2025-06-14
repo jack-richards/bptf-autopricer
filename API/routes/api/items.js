@@ -1,20 +1,20 @@
-const express = require("express");
-const fs = require("fs");
+const express = require('express');
+const fs = require('fs');
 
 const router = express.Router();
 
-const PRICELIST_PATH = "./files/pricelist.json";
-const ITEM_LIST_PATH = "./files/item_list.json";
+const PRICELIST_PATH = './files/pricelist.json';
+const ITEM_LIST_PATH = './files/item_list.json';
 
 // Get item price by SKU.
-router.get("/:sku", async (req, res) => {
+router.get('/:sku', async (req, res) => {
   let item_found = false;
   let item_object = {};
 
-  fs.readFile(PRICELIST_PATH, "utf8", (err, data) => {
+  fs.readFile(PRICELIST_PATH, 'utf8', (err, data) => {
     if (err) {
       // req.reject etc.
-      return res.status(400).json({ error: "Failed to load pricelist." });
+      return res.status(400).json({ error: 'Failed to load pricelist.' });
     }
 
     let sku = req.params.sku;
@@ -41,12 +41,12 @@ router.get("/:sku", async (req, res) => {
 });
 
 // Get pricelist.
-router.get("/", (req, res) => {
+router.get('/', (req, res) => {
   // Read pricelist into memory and send.
-  fs.readFile(PRICELIST_PATH, "utf8", (err, data) => {
+  fs.readFile(PRICELIST_PATH, 'utf8', (err, data) => {
     if (err) {
       console.error(err);
-      return res.status(400).json({ error: "Failed to load pricelist." });
+      return res.status(400).json({ error: 'Failed to load pricelist.' });
     }
 
     data = JSON.parse(data);
@@ -58,21 +58,21 @@ router.get("/", (req, res) => {
 
 // Request check endpoint. For now this will do
 // nothing but return a status code of 200.
-router.post("/:sku", (req, res) => {
+router.post('/:sku', (req, res) => {
   return res.status(200).json({ sku: req.params.sku });
 });
 
 // Routes for adding/removing items.
-router.post("/add/:name", (req, res) => {
+router.post('/add/:name', (req, res) => {
   let name = req.params.name;
   let item_found = false;
   let new_item = { name: name };
 
   // Check if item exists already.
-  fs.readFile(ITEM_LIST_PATH, "utf8", (err, data) => {
+  fs.readFile(ITEM_LIST_PATH, 'utf8', (err, data) => {
     if (err) {
       console.error(err);
-      return res.status(400).json({ error: "Failed to load item list." });
+      return res.status(400).json({ error: 'Failed to load item list.' });
     }
 
     try {
@@ -96,7 +96,7 @@ router.post("/add/:name", (req, res) => {
       // Item was not found in the item list. Adding item.
       data.items.push(new_item);
 
-      fs.writeFile(ITEM_LIST_PATH, JSON.stringify(data), "utf8", (err) => {
+      fs.writeFile(ITEM_LIST_PATH, JSON.stringify(data), 'utf8', (err) => {
         if (err) {
           return res.sendStatus(400);
         }
@@ -106,15 +106,15 @@ router.post("/add/:name", (req, res) => {
   });
 });
 
-router.post("/delete/:name", (req, res) => {
+router.post('/delete/:name', (req, res) => {
   let name = req.params.name;
   let item_found = false;
 
   // Check if item exists.
-  fs.readFile(ITEM_LIST_PATH, "utf8", (err, data) => {
+  fs.readFile(ITEM_LIST_PATH, 'utf8', (err, data) => {
     if (err) {
       console.error(err);
-      return res.status(400).json({ error: "Failed to load item list." });
+      return res.status(400).json({ error: 'Failed to load item list.' });
     }
     try {
       data = JSON.parse(data);
@@ -134,7 +134,7 @@ router.post("/delete/:name", (req, res) => {
 
     // Item found, saving version of item list with the item deleted.
     if (item_found) {
-      fs.writeFile(ITEM_LIST_PATH, JSON.stringify(data), "utf8", (err) => {
+      fs.writeFile(ITEM_LIST_PATH, JSON.stringify(data), 'utf8', (err) => {
         if (err) {
           return res.sendStatus(400);
         }

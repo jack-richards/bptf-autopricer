@@ -1,17 +1,17 @@
-const fs = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 
 const DEFAULTS = {
-  bptfAPIKey: "",
-  bptfToken: "",
-  steamAPIKey: "",
+  bptfAPIKey: '',
+  bptfToken: '',
+  steamAPIKey: '',
   database: {
-    schema: "tf2",
-    host: "localhost",
+    schema: 'tf2',
+    host: 'localhost',
     port: 5432,
-    name: "bptf-autopricer",
-    user: "postgres",
-    password: "",
+    name: 'bptf-autopricer',
+    user: 'postgres',
+    password: '',
   },
   pricerPort: 3456,
   maxPercentageDifferences: {
@@ -34,11 +34,11 @@ const DEFAULTS = {
 function deepMerge(target, src) {
   for (const key in src) {
     if (
-      typeof src[key] === "object" &&
+      typeof src[key] === 'object' &&
       src[key] !== null &&
       !Array.isArray(src[key])
     ) {
-      if (!target[key]) target[key] = {};
+      if (!target[key]) {target[key] = {};}
       deepMerge(target[key], src[key]);
     } else if (target[key] === undefined) {
       target[key] = src[key];
@@ -52,15 +52,15 @@ function deepClone(obj) {
 }
 
 const REQUIRED_FIELDS = [
-  "bptfAPIKey",
-  "bptfToken",
-  "steamAPIKey",
-  "database",
-  "pricerPort",
+  'bptfAPIKey',
+  'bptfToken',
+  'steamAPIKey',
+  'database',
+  'pricerPort',
 ];
 
 function validateConfig(configPath) {
-  let config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  let config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   const original = deepClone(config);
 
   // Add missing defaults
@@ -79,7 +79,7 @@ function validateConfig(configPath) {
   }
   // Check for required database fields
   const db = merged.database;
-  const dbRequired = ["schema", "host", "port", "name", "user", "password"];
+  const dbRequired = ['schema', 'host', 'port', 'name', 'user', 'password'];
   for (const field of dbRequired) {
     if (db[field] === undefined) {
       throw new Error(`Missing required database config field: ${field}`);

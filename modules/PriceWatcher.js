@@ -1,5 +1,5 @@
-const fs = require("fs");
-const path = require("path");
+const fs = require('fs');
+const path = require('path');
 
 /**
  * Reads a pricelist JSON file and logs items whose timestamp is older than the given threshold.
@@ -7,7 +7,7 @@ const path = require("path");
  * @param {number} ageThresholdSec - Age threshold in seconds (e.g. 2*3600 for 2 hours)
  */
 function checkOldPrices(pricelistPath, ageThresholdSec = 2 * 3600) {
-  fs.readFile(pricelistPath, "utf8", (err, data) => {
+  fs.readFile(pricelistPath, 'utf8', (err, data) => {
     if (err) {
       console.error(`Error reading pricelist file at ${pricelistPath}:`, err);
       return;
@@ -16,7 +16,7 @@ function checkOldPrices(pricelistPath, ageThresholdSec = 2 * 3600) {
     try {
       json = JSON.parse(data);
     } catch (parseErr) {
-      console.error("Error parsing pricelist JSON:", parseErr);
+      console.error('Error parsing pricelist JSON:', parseErr);
       return;
     }
 
@@ -63,7 +63,7 @@ function watchPrices(pricelistPath, intervalSec = 86400) {
 
 // If run directly, watch the default pricelist.json in this directory
 if (require.main === module) {
-  const file = path.join(__dirname, "pricelist.json");
+  const file = path.join(__dirname, 'pricelist.json');
   watchPrices(file);
 }
 

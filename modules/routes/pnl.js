@@ -1,9 +1,9 @@
 // routes/pnl.js
-const express = require("express");
-const path = require("path");
-const { loadJson } = require("../utils");
-const renderPage = require("../layout");
-const fs = require("fs");
+const express = require('express');
+const path = require('path');
+const { loadJson } = require('../utils');
+const renderPage = require('../layout');
+const fs = require('fs');
 
 module.exports = function (app, config) {
   const router = express.Router();
@@ -11,21 +11,21 @@ module.exports = function (app, config) {
     __dirname,
     config.tf2AutobotDir,
     config.botTradingDir,
-    "polldata.json",
+    'polldata.json',
   );
-  const pricelistPath = path.resolve(__dirname, "../../files/pricelist.json");
-  const keyPrice = loadJson(pricelistPath).items.find((i) => i.sku === "5021;6")
+  const pricelistPath = path.resolve(__dirname, '../../files/pricelist.json');
+  const keyPrice = loadJson(pricelistPath).items.find((i) => i.sku === '5021;6')
     ?.sell?.metal;
 
-  router.get("/pnl", (req, res) => {
+  router.get('/pnl', (req, res) => {
     let parsed;
     try {
-      const raw = fs.readFileSync(pollDataPath, "utf8");
+      const raw = fs.readFileSync(pollDataPath, 'utf8');
       parsed = JSON.parse(raw);
     } catch (e) {
       return res
         .status(500)
-        .send(renderPage("P&L Dashboard", "<p>Error loading trade data.</p>"));
+        .send(renderPage('P&L Dashboard', '<p>Error loading trade data.</p>'));
     }
 
     const history = Object.values(parsed.offerData || {}).filter(
@@ -39,23 +39,23 @@ module.exports = function (app, config) {
     history.sort((a, b) => {
       let ta = a.time || a.actionTimestamp;
       let tb = b.time || b.actionTimestamp;
-      if (typeof ta === "number" && ta < 1e12) ta *= 1000;
-      if (typeof tb === "number" && tb < 1e12) tb *= 1000;
+      if (typeof ta === 'number' && ta < 1e12) {ta *= 1000;}
+      if (typeof tb === 'number' && tb < 1e12) {tb *= 1000;}
       return (ta || 0) - (tb || 0);
     });
 
     let lastTimestamp = 0;
     for (const t of history) {
       let timestamp = t.time || t.actionTimestamp;
-      if (typeof timestamp === "number" && timestamp < 1e12) timestamp *= 1000;
-      if (!timestamp || isNaN(timestamp)) continue; // skip if missing
+      if (typeof timestamp === 'number' && timestamp < 1e12) {timestamp *= 1000;}
+      if (!timestamp || isNaN(timestamp)) {continue;} // skip if missing
 
       // Ensure strictly increasing timestamps
-      if (timestamp <= lastTimestamp) timestamp = lastTimestamp + 1;
+      if (timestamp <= lastTimestamp) {timestamp = lastTimestamp + 1;}
       lastTimestamp = timestamp;
 
       const date = new Date(timestamp);
-      if (isNaN(date.getTime())) continue;
+      if (isNaN(date.getTime())) {continue;}
 
       const timeISO = date.toISOString();
 
@@ -73,7 +73,7 @@ module.exports = function (app, config) {
       profitPoints.push({ x: timeISO, y: parseFloat(totalProfit.toFixed(2)) });
 
       for (const [sku, qty] of skuList) {
-        if (!summary[sku]) summary[sku] = { qty: 0, profit: 0 };
+        if (!summary[sku]) {summary[sku] = { qty: 0, profit: 0 };}
         summary[sku].qty += qty;
         summary[sku].profit += profit;
       }
@@ -92,7 +92,7 @@ module.exports = function (app, config) {
         ([sku, data]) =>
           `<tr><td>${sku}</td><td>${data.qty}</td><td>${data.profit.toFixed(2)} Ref</td></tr>`,
       )
-      .join("");
+      .join('');
 
     const html = `
         <h1>Profit & Loss Dashboard</h1>
@@ -146,8 +146,8 @@ module.exports = function (app, config) {
         </script>
     `;
 
-    res.send(renderPage("P&L Dashboard", html));
+    res.send(renderPage('P&L Dashboard', html));
   });
 
-  app.use("/", router);
+  app.use('/', router);
 };

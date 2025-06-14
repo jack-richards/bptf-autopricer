@@ -1,11 +1,11 @@
-const express = require("express");
-const path = require("path");
-const { loadJson } = require("../utils");
-const { db } = require("../../bptf-autopricer");
-const renderPage = require("../layout");
+const express = require('express');
+const path = require('path');
+const { loadJson } = require('../utils');
+const { db } = require('../../bptf-autopricer');
+const renderPage = require('../layout');
 
 module.exports = (app, config) => {
-  app.get("/key-prices", async (req, res) => {
+  app.get('/key-prices', async (req, res) => {
     try {
       const data = await db.any(`
         SELECT timestamp, buy_price_metal, sell_price_metal
@@ -42,7 +42,7 @@ module.exports = (app, config) => {
 
       res.send(
         renderPage(
-          "Key Prices (Last 14 Days)",
+          'Key Prices (Last 14 Days)',
           `
         <body>
           <h1>Key Prices (Last 14 Days)</h1>
@@ -103,8 +103,8 @@ module.exports = (app, config) => {
         ),
       );
     } catch (err) {
-      console.error("Failed to load key prices:", err);
-      res.status(500).send("Could not retrieve key price data.");
+      console.error('Failed to load key prices:', err);
+      res.status(500).send('Could not retrieve key price data.');
     }
   });
 };

@@ -1,8 +1,8 @@
 // utils.js
-const fs = require("fs");
+const fs = require('fs');
 
 function loadJson(file) {
-  return JSON.parse(fs.readFileSync(file, "utf8"));
+  return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
 function saveJson(file, obj) {

@@ -1,4 +1,4 @@
-const pgpLib = require("pg-promise");
+const pgpLib = require('pg-promise');
 
 function createDb(config) {
   const pgp = pgpLib({ schema: config.database.schema });
@@ -11,9 +11,9 @@ function createDb(config) {
   };
   const db = pgp(cn);
   const cs = new pgp.helpers.ColumnSet(
-    ["name", "sku", "currencies", "intent", "updated", "steamid"],
+    ['name', 'sku', 'currencies', 'intent', 'updated', 'steamid'],
     {
-      table: "listings",
+      table: 'listings',
     },
   );
   return { db, pgp, cs };

@@ -1,6 +1,6 @@
 async function updateMovingAverages(db, pgp, alpha = 0.35) {
   if (alpha <= 0 || alpha > 1) {
-    throw new Error("Alpha must be between 0 (exclusive) and 1 (inclusive).");
+    throw new Error('Alpha must be between 0 (exclusive) and 1 (inclusive).');
   }
   const stats = await db.any(`
         SELECT sku, current_count, moving_avg_count,
@@ -8,7 +8,7 @@ async function updateMovingAverages(db, pgp, alpha = 0.35) {
                current_sell_count, moving_avg_sell_count
         FROM listing_stats
     `);
-  if (stats.length === 0) return;
+  if (stats.length === 0) {return;}
 
   // clampAndRound ensures all moving averages:
   // - are rounded to 2 decimal places (e.g., 1.2345 -> 1.23)
@@ -56,18 +56,18 @@ async function updateMovingAverages(db, pgp, alpha = 0.35) {
     });
 
   if (updates.length === 0) {
-    console.log("No moving averages changed.");
+    console.log('No moving averages changed.');
     return;
   }
 
   const cs = new pgp.helpers.ColumnSet(
     [
-      "sku",
-      "moving_avg_count",
-      "moving_avg_buy_count",
-      "moving_avg_sell_count",
+      'sku',
+      'moving_avg_count',
+      'moving_avg_buy_count',
+      'moving_avg_sell_count',
     ],
-    { table: "tmp" },
+    { table: 'tmp' },
   );
   const values = pgp.helpers.values(updates, cs);
 
@@ -85,12 +85,12 @@ async function updateMovingAverages(db, pgp, alpha = 0.35) {
     // Fetch and log updated rows for validation
     const updatedSkus = updates.map((u) => u.sku);
     const updatedRows = await db.any(
-      `SELECT sku, moving_avg_count, moving_avg_buy_count, moving_avg_sell_count FROM listing_stats WHERE sku IN ($1:csv) ORDER BY sku`,
+      'SELECT sku, moving_avg_count, moving_avg_buy_count, moving_avg_sell_count FROM listing_stats WHERE sku IN ($1:csv) ORDER BY sku',
       [updatedSkus],
     );
-    console.log("Updated moving averages:", updatedRows);
+    console.log('Updated moving averages:', updatedRows);
   } catch (err) {
-    console.error("Error updating moving averages:", err);
+    console.error('Error updating moving averages:', err);
   }
 }
 
@@ -118,7 +118,7 @@ async function updateListingStats(db, sku) {
 }
 
 async function initializeListingStats(db) {
-  const skus = await db.any(`SELECT DISTINCT sku FROM listings`);
+  const skus = await db.any('SELECT DISTINCT sku FROM listings');
   for (const { sku } of skus) {
     await updateListingStats(db, sku);
   }

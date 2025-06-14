@@ -1,22 +1,22 @@
 // This file is part of the BPTF Autopricer project.
 // It is a Node.js application that connects to Backpack.tf's WebSocket API,
-const fs = require("fs");
-const chokidar = require("chokidar");
-const methods = require("./methods");
+const fs = require('fs');
+const chokidar = require('chokidar');
+const methods = require('./methods');
 const Methods = new methods();
-const path = require("path");
-const { validateConfig } = require("./modules/configValidation");
-const CONFIG_PATH = path.resolve(__dirname, "config.json");
+const path = require('path');
+const { validateConfig } = require('./modules/configValidation');
+const CONFIG_PATH = path.resolve(__dirname, 'config.json');
 const config = validateConfig(CONFIG_PATH);
-const PriceWatcher = require("./modules/PriceWatcher"); //outdated price logging
-const Schema = require("@tf2autobot/tf2-schema");
-const SCHEMA_PATH = "./schema.json";
+const PriceWatcher = require('./modules/PriceWatcher'); //outdated price logging
+const Schema = require('@tf2autobot/tf2-schema');
+const SCHEMA_PATH = './schema.json';
 // Paths to the pricelist and item list files.
-const PRICELIST_PATH = "./files/pricelist.json";
-const ITEM_LIST_PATH = "./files/item_list.json";
-const { listen, socketIO } = require("./API/server.js");
-const { startPriceWatcher } = require("./modules/index");
-const scheduleTasks = require("./modules/scheduler");
+const PRICELIST_PATH = './files/pricelist.json';
+const ITEM_LIST_PATH = './files/item_list.json';
+const { listen, socketIO } = require('./API/server.js');
+const { startPriceWatcher } = require('./modules/index');
+const scheduleTasks = require('./modules/scheduler');
 
 const {
   sendPriceAlert,
@@ -24,23 +24,23 @@ const {
   insertKeyPrice,
   adjustPrice,
   checkKeyPriceStability,
-} = require("./modules/keyPriceUtils");
+} = require('./modules/keyPriceUtils');
 
 const {
   updateMovingAverages,
   updateListingStats,
   initializeListingStats,
-} = require("./modules/listingAverages");
+} = require('./modules/listingAverages');
 
 const {
   getListings,
   insertListing,
   deleteRemovedListing,
   deleteOldListings,
-} = require("./modules/listings");
-const logDir = path.join(__dirname, "logs");
-const logFile = path.join(logDir, "websocket.log");
-if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
+} = require('./modules/listings');
+const logDir = path.join(__dirname, 'logs');
+const logFile = path.join(logDir, 'websocket.log');
+if (!fs.existsSync(logDir)) {fs.mkdirSync(logDir);}
 
 // Steam API key is required for the schema manager to work.
 const schemaManager = new Schema({
@@ -62,14 +62,14 @@ const blockedAttributes = config.blockedAttributes;
 const fallbackOntoPricesTf = config.fallbackOntoPricesTf;
 
 // Create database instance for pg-promise.
-const createDb = require("./modules/db");
+const createDb = require('./modules/db');
 const { db, pgp, cs } = createDb(config);
 
 if (fs.existsSync(SCHEMA_PATH)) {
   // A cached schema exists.
 
   // Read and parse the cached schema.
-  const cachedData = JSON.parse(fs.readFileSync(SCHEMA_PATH), "utf8");
+  const cachedData = JSON.parse(fs.readFileSync(SCHEMA_PATH), 'utf8');
 
   // Set the schema data.
   schemaManager.setSchema(cachedData);
@@ -78,7 +78,7 @@ if (fs.existsSync(SCHEMA_PATH)) {
 // Pricelist doesn't exist.
 if (!fs.existsSync(PRICELIST_PATH)) {
   try {
-    fs.writeFileSync(PRICELIST_PATH, '{"items": []}', "utf8");
+    fs.writeFileSync(PRICELIST_PATH, '{"items": []}', 'utf8');
   } catch (err) {
     console.error(err);
   }
@@ -87,14 +87,14 @@ if (!fs.existsSync(PRICELIST_PATH)) {
 // Item list doesn't exist.
 if (!fs.existsSync(ITEM_LIST_PATH)) {
   try {
-    fs.writeFileSync(ITEM_LIST_PATH, '{"items": []}', "utf8");
+    fs.writeFileSync(ITEM_LIST_PATH, '{"items": []}', 'utf8');
   } catch (err) {
     console.error(err);
   }
 }
 
 // This event is emitted when the schema has been fetched.
-schemaManager.on("schema", function (schema) {
+schemaManager.on('schema', function (schema) {
   // Writes the schema data to disk.
   fs.writeFileSync(SCHEMA_PATH, JSON.stringify(schema.toJSON()));
 });
@@ -109,22 +109,22 @@ const updateKeyObject = async () => {
     // Primary: Prices.TF API
     key_item = await Methods.getKeyFromExternalAPI();
   } catch (e) {
-    console.error("Prices.TF API failed, falling back to autobot.tf pricelist");
+    console.error('Prices.TF API failed, falling back to autobot.tf pricelist');
 
     // 2a) fetch the external pricelist
     const externalPricelist = await Methods.getExternalPricelist();
 
     // 2b) grab the item with the same SKU
     const { pricetfItem } = Methods.getItemPriceFromExternalPricelist(
-      "5021;6",
+      '5021;6',
       externalPricelist,
     );
 
     // 2c) reshape to match the key_item interface
     key_item = {
-      name: pricetfItem.name || "Mann Co. Supply Crate Key", // or whatever defaults you prefer
-      sku: "5021;6",
-      source: "bptf",
+      name: pricetfItem.name || 'Mann Co. Supply Crate Key', // or whatever defaults you prefer
+      sku: '5021;6',
+      source: 'bptf',
       buy: {
         keys: pricetfItem.buy.keys,
         metal: pricetfItem.buy.metal,
@@ -144,13 +144,13 @@ const updateKeyObject = async () => {
     metal: key_item.sell.metal,
   };
 
-  socketIO.emit("price", key_item);
+  socketIO.emit('price', key_item);
 };
 
-const { initBptfWebSocket } = require("./websocket/bptfWebSocket");
+const { initBptfWebSocket } = require('./websocket/bptfWebSocket');
 
 // Load item names and bounds from item_list.json
-const createItemListManager = require("./modules/itemList");
+const createItemListManager = require('./modules/itemList');
 const itemListManager = createItemListManager(ITEM_LIST_PATH);
 const { loadNames, watchItemList, getAllowedItemNames, getItemBounds } =
   itemListManager;
@@ -178,12 +178,12 @@ const calculateAndEmitPrices = async () => {
         (item.sell.keys === 0 && item.sell.metal === 0)
       ) {
         throw new Error(
-          "Autobot cache of prices.tf pricelist has marked item with price of 0.",
+          'Autobot cache of prices.tf pricelist has marked item with price of 0.',
         );
       }
 
       // If it's a key (sku 5021;6), insert the price into the key_prices table
-      if (sku === "5021;6") {
+      if (sku === '5021;6') {
         const buyPrice = item.buy.metal;
         const sellPrice = item.sell.metal;
         const timestamp = Math.floor(Date.now() / 1000);
@@ -198,7 +198,7 @@ const calculateAndEmitPrices = async () => {
       // Up to your own discretion whether this is needed or not.
       item_objects.push(item);
     } catch (e) {
-      console.log("Couldn't create a price for " + name);
+      console.log('Couldn\'t create a price for ' + name);
     }
   }
   // Emit all items within extremely quick succession of eachother.
@@ -206,17 +206,17 @@ const calculateAndEmitPrices = async () => {
   for (const item of item_objects) {
     // Emit item object.
     await Methods.waitXSeconds(0.3);
-    socketIO.emit("price", item);
+    socketIO.emit('price', item);
   }
 };
 
 // When the schema manager is ready we proceed.
 schemaManager.init(async function (err) {
-  if (err) throw err;
+  if (err) {throw err;}
 
   // Start watching pricelist.json for “old” entries
   // pricelist.json lives in ./files/pricelist.json relative to this file:
-  const pricelistPath = path.resolve(__dirname, "./files/pricelist.json");
+  const pricelistPath = path.resolve(__dirname, './files/pricelist.json');
   // You can pass a custom ageThresholdSec (default is 2*3600) and intervalSec (default is 300)
   PriceWatcher.watchPrices(pricelistPath /*, ageThresholdSec, intervalSec */);
 
@@ -274,10 +274,10 @@ schemaManager.init(async function (err) {
 async function isPriceSwingAcceptable(prev, next, sku) {
   // Fetch last 5 prices from DB
   const history = await db.any(
-    "SELECT buy_metal, sell_metal FROM price_history WHERE sku = $1 ORDER BY timestamp DESC LIMIT 5",
+    'SELECT buy_metal, sell_metal FROM price_history WHERE sku = $1 ORDER BY timestamp DESC LIMIT 5',
     [sku],
   );
-  if (history.length === 0) return true; // No history, allow
+  if (history.length === 0) {return true;} // No history, allow
 
   const avgBuy =
     history.reduce((sum, p) => sum + Number(p.buy_metal), 0) / history.length;
@@ -303,8 +303,8 @@ const determinePrice = async (name, sku) => {
   // Delete listings based on moving averages.
   await deleteOldListings(db);
 
-  var buyListings = await getListings(db, name, "buy");
-  var sellListings = await getListings(db, name, "sell");
+  var buyListings = await getListings(db, name, 'buy');
+  var sellListings = await getListings(db, name, 'sell');
 
   // Get the price of the item from the in-memory external pricelist.
   var data;
@@ -413,7 +413,7 @@ const determinePrice = async (name, sku) => {
 // The Z-score is a measure of how many standard deviations a value is from the mean.
 const calculateZScore = (value, mean, stdDev) => {
   if (stdDev === 0) {
-    throw new Error("Standard deviation cannot be zero.");
+    throw new Error('Standard deviation cannot be zero.');
   }
   return (value - mean) / stdDev;
 };
@@ -444,7 +444,7 @@ const filterOutliers = (listingsArray) => {
   });
 
   if (filteredListings.length < 3) {
-    throw new Error("Not enough listings after filtering outliers.");
+    throw new Error('Not enough listings after filtering outliers.');
   }
   // Get the first 3 buy listings from the filtered listings and calculate the mean.
   // The listings here should be free of outliers. It's also sorted in order of
@@ -460,7 +460,7 @@ const filterOutliers = (listingsArray) => {
 
   // Validate the mean.
   if (!filteredMean || isNaN(filteredMean) || filteredMean === 0) {
-    throw new Error("Mean calculated is invalid.");
+    throw new Error('Mean calculated is invalid.');
   }
 
   return filteredMean;
@@ -586,8 +586,8 @@ const getAverages = (name, buyFiltered, sellFiltered, sku, pricetfItem) => {
 function clamp(val, min, max) {
   // If min is not a number, we don't clamp the value.
   // If max is not a number, we don't clamp the value.
-  if (typeof min === "number" && val < min) return min;
-  if (typeof max === "number" && val > max) return max;
+  if (typeof min === 'number' && val < min) {return min;}
+  if (typeof max === 'number' && val > max) {return max;}
   return val;
 }
 
@@ -599,7 +599,7 @@ const finalisePrice = async (arr, name, sku) => {
         `| UPDATING PRICES |:${name} couldn't be updated. CRITICAL, something went wrong in the getAverages logic.`,
       );
       throw new Error(
-        "Something went wrong in the getAverages() logic. DEVELOPER LOOK AT THIS.",
+        'Something went wrong in the getAverages() logic. DEVELOPER LOOK AT THIS.',
       );
       // Will ensure that neither the buy, nor sell side is completely unpriced. If it is, this means we couldn't get
       // enough listings to create a price, and we also somehow bypassed our prices.tf safety check. So instead, we
@@ -608,7 +608,7 @@ const finalisePrice = async (arr, name, sku) => {
       (arr[0].metal === 0 && arr[0].keys === 0) ||
       (arr[1].metal === 0 && arr[1].keys === 0)
     ) {
-      throw new Error("Missing buy and/or sell side.");
+      throw new Error('Missing buy and/or sell side.');
     } else {
       // Creating item fields/filling in details.
       // Name of the item. Left as it was.
@@ -616,7 +616,7 @@ const finalisePrice = async (arr, name, sku) => {
       // Add sku to item object.
       item.sku = sku;
       // If the source isn't provided as bptf it's ignored by tf2autobot.
-      item.source = "bptf";
+      item.source = 'bptf';
       // Generates a UNIX timestamp of the present time, used to show a client when the prices were last updated.
       item.time = Math.floor(Date.now() / 1000);
 
@@ -675,7 +675,7 @@ const finalisePrice = async (arr, name, sku) => {
       );
 
       // Load previous price from pricelist if available
-      const pricelist = JSON.parse(fs.readFileSync(PRICELIST_PATH, "utf8"));
+      const pricelist = JSON.parse(fs.readFileSync(PRICELIST_PATH, 'utf8'));
       const prev = pricelist.items.find((i) => i.sku === sku);
 
       // Only check if previous price exists
@@ -693,7 +693,7 @@ const finalisePrice = async (arr, name, sku) => {
 
       // Save to price history
       await db.none(
-        "INSERT INTO price_history (sku, buy_metal, sell_metal, timestamp) VALUES ($1, $2, $3, NOW())",
+        'INSERT INTO price_history (sku, buy_metal, sell_metal, timestamp) VALUES ($1, $2, $3, NOW())',
         [
           sku,
           Methods.toMetal(item.buy, keyobj.metal),

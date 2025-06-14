@@ -1,13 +1,13 @@
 var Methods = function () {};
-var fs = require("fs");
-const path = require("path");
+var fs = require('fs');
+const path = require('path');
 
-const axios = require("axios");
-const AsyncLock = require("async-lock");
+const axios = require('axios');
+const AsyncLock = require('async-lock');
 const lock = new AsyncLock();
 
-const config = require("./config.json");
-const CACHE_FILE_PATH = path.resolve(__dirname, "cached-pricelist.json");
+const config = require('./config.json');
+const CACHE_FILE_PATH = path.resolve(__dirname, 'cached-pricelist.json');
 
 Methods.prototype.halfScrapToRefined = function (halfscrap) {
   var refined = parseFloat(
@@ -45,7 +45,7 @@ Methods.prototype.getRight = function (v) {
 Methods.prototype.parsePrice = function (original, keyPrice) {
   // Defensive: ensure keys is always an integer
   if (!Number.isInteger(original.keys)) {
-    console.error("parsePrice called with non-integer keys:", original);
+    console.error('parsePrice called with non-integer keys:', original);
     original.keys = Math.trunc(original.keys);
   }
   var metal = this.getRight(original.keys * keyPrice) + original.metal;
@@ -84,7 +84,7 @@ Methods.prototype.getItemPriceFromExternalPricelist = function (
       };
     }
   }
-  throw new Error("Item not found in external pricelist.");
+  throw new Error('Item not found in external pricelist.');
 };
 
 // Calculate percentage differences and decide on rejecting or accepting the autopricers price
@@ -132,7 +132,7 @@ Methods.prototype.calculatePricingAPIDifferences = function (
     isNaN(percentageDifferences.sellDifference)
   ) {
     // Can't compare percentages because the external API likely returned malformed data.
-    throw new Error("External API returned NaN. Critical error.");
+    throw new Error('External API returned NaN. Critical error.');
   }
   // Calls another method that uses this percentage difference object to make decision on whether to use our autopricers price or not.
   try {
@@ -157,11 +157,11 @@ Methods.prototype.validatePrice = function (percentageDifferences) {
   if (
     percentageDifferences.buyDifference > config.maxPercentageDifferences.buy
   ) {
-    throw new Error("Autopricer is buying for too much.");
+    throw new Error('Autopricer is buying for too much.');
   } else if (
     percentageDifferences.sellDifference < config.maxPercentageDifferences.sell
   ) {
-    throw new Error("Autopricer is selling for too cheap.");
+    throw new Error('Autopricer is selling for too cheap.');
   }
   return true;
 };
@@ -179,7 +179,7 @@ Methods.prototype.validateObject = function (obj) {
     return false;
   }
   if (Object.keys(obj).length > 0) {
-    if (obj.hasOwnProperty("keys") || obj.hasOwnProperty("metal")) {
+    if (obj.hasOwnProperty('keys') || obj.hasOwnProperty('metal')) {
       // The object is valid as it contains at least one expected key.
       return true;
     } else {
@@ -198,11 +198,11 @@ Methods.prototype.createCurrencyObject = function (obj) {
     metal: 0,
   };
 
-  if (obj.hasOwnProperty("keys")) {
+  if (obj.hasOwnProperty('keys')) {
     newObj.keys = obj.keys;
   }
 
-  if (obj.hasOwnProperty("metal")) {
+  if (obj.hasOwnProperty('metal')) {
     newObj.metal = obj.metal;
   }
 
@@ -215,8 +215,8 @@ const comparePrices = (item1, item2) => {
 
 Methods.prototype.addToPricelist = function (item, PRICELIST_PATH) {
   try {
-    lock.acquire("pricelist", () => {
-      const data = fs.readFileSync(PRICELIST_PATH, "utf8");
+    lock.acquire('pricelist', () => {
+      const data = fs.readFileSync(PRICELIST_PATH, 'utf8');
       let existingData = JSON.parse(data);
       let items = Array.isArray(existingData.items) ? existingData.items : [];
 
@@ -225,7 +225,7 @@ Methods.prototype.addToPricelist = function (item, PRICELIST_PATH) {
 
       // Validate new item
       if (!item || !item.name || !item.sku || !item.buy || !item.sell) {
-        console.error("Attempted to add malformed item to pricelist:", item);
+        console.error('Attempted to add malformed item to pricelist:', item);
         return;
       }
 
@@ -248,12 +248,12 @@ Methods.prototype.addToPricelist = function (item, PRICELIST_PATH) {
       existingData.items = items;
 
       // Atomic write
-      const tempPath = PRICELIST_PATH + ".tmp";
-      fs.writeFileSync(tempPath, JSON.stringify(existingData, null, 2), "utf8");
+      const tempPath = PRICELIST_PATH + '.tmp';
+      fs.writeFileSync(tempPath, JSON.stringify(existingData, null, 2), 'utf8');
       fs.renameSync(tempPath, PRICELIST_PATH);
     });
   } catch (error) {
-    console.error("Error:", error);
+    console.error('Error:', error);
   }
 };
 
@@ -264,7 +264,7 @@ Methods.prototype.getListingsFromSnapshots = async function (name) {
     // Endpoint is limited to 1 request per 60 seconds.
     await this.waitXSeconds(1);
     const response = await axios.get(
-      `https://backpack.tf/api/classifieds/listings/snapshot`,
+      'https://backpack.tf/api/classifieds/listings/snapshot',
       {
         params: {
           sku: name,
@@ -277,7 +277,7 @@ Methods.prototype.getListingsFromSnapshots = async function (name) {
       const listings = response.data.listings;
       return listings;
     } else {
-      throw new Error("Rate limited.");
+      throw new Error('Rate limited.');
     }
   } catch (error) {
     throw error;
@@ -289,7 +289,7 @@ Methods.prototype.getJWTFromPricesTF = async function (page, limit) {
 
   while (tries <= 3) {
     try {
-      const response = await axios.post("https://api2.prices.tf/auth/access");
+      const response = await axios.post('https://api2.prices.tf/auth/access');
       if (response.status === 200) {
         const axiosConfig = {
           headers: {
@@ -309,7 +309,7 @@ Methods.prototype.getJWTFromPricesTF = async function (page, limit) {
         await this.waitXSeconds(60);
       }
       console.log(
-        "Error occurred getting auth token from prices.tf, retrying...",
+        'Error occurred getting auth token from prices.tf, retrying...',
       );
     }
 
@@ -317,7 +317,7 @@ Methods.prototype.getJWTFromPricesTF = async function (page, limit) {
   }
 
   throw new Error(
-    "An error occurred while getting authenticated with Prices.tf",
+    'An error occurred while getting authenticated with Prices.tf',
   );
 };
 
@@ -328,7 +328,7 @@ Methods.prototype.getKeyPriceFromPricesTF = async function () {
     let tries = 1;
     while (tries <= 5) {
       const response = await axios.get(
-        "https://api2.prices.tf/prices/5021;6",
+        'https://api2.prices.tf/prices/5021;6',
         axiosConfig,
       );
 
@@ -345,7 +345,7 @@ Methods.prototype.getKeyPriceFromPricesTF = async function () {
     }
 
     throw new Error(
-      "Failed to get key price from Prices.TF. It is either down or we are being rate-limited.",
+      'Failed to get key price from Prices.TF. It is either down or we are being rate-limited.',
     );
   } catch (error) {
     throw error;
@@ -361,14 +361,14 @@ Methods.prototype.getKeyFromExternalAPI = async function () {
     let tries = 1;
     while (tries <= 5) {
       const response = await axios.get(
-        "https://api2.prices.tf/prices/5021;6",
+        'https://api2.prices.tf/prices/5021;6',
         axiosConfig,
       );
 
       if (response.status === 200) {
-        key_object.name = "Mann Co. Supply Crate Key";
-        key_object.sku = "5021;6";
-        key_object.source = "bptf";
+        key_object.name = 'Mann Co. Supply Crate Key';
+        key_object.sku = '5021;6';
+        key_object.source = 'bptf';
 
         let buyKeys = Object.is(response.data.buyKeys, undefined)
           ? 0
@@ -415,7 +415,7 @@ Methods.prototype.getKeyFromExternalAPI = async function () {
     }
 
     throw new Error(
-      "Failed to get key price from Prices.TF. It is either down or we are being rate-limited.",
+      'Failed to get key price from Prices.TF. It is either down or we are being rate-limited.',
     );
   } catch (error) {
     throw error;
@@ -424,20 +424,20 @@ Methods.prototype.getKeyFromExternalAPI = async function () {
 
 Methods.prototype.getExternalPricelist = async function () {
   try {
-    const response = await axios.get("https://autobot.tf/json/pricelist-array");
+    const response = await axios.get('https://autobot.tf/json/pricelist-array');
     if (
       !response.data ||
       !Array.isArray(response.data.items) ||
       response.data.items.length === 0
     ) {
-      throw new Error("No items in external pricelist.");
+      throw new Error('No items in external pricelist.');
     }
     // Cache the fetched pricelist to file
     try {
       await fs.promises.writeFile(
         CACHE_FILE_PATH,
         JSON.stringify(response.data, null, 2),
-        "utf-8",
+        'utf-8',
       );
     } catch (writeErr) {
       console.warn(
@@ -450,7 +450,7 @@ Methods.prototype.getExternalPricelist = async function () {
       `Could not fetch external pricelist, falling back to cache: ${err.message}`,
     );
     try {
-      const cached = await fs.promises.readFile(CACHE_FILE_PATH, "utf-8");
+      const cached = await fs.promises.readFile(CACHE_FILE_PATH, 'utf-8');
       const data = JSON.parse(cached);
       return data;
     } catch (cacheErr) {

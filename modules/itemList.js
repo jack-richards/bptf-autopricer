@@ -1,5 +1,5 @@
-const fs = require("fs");
-const chokidar = require("chokidar");
+const fs = require('fs');
+const chokidar = require('chokidar');
 
 function createItemListManager(ITEM_LIST_PATH) {
   let allowedItemNames = new Set();
@@ -7,7 +7,7 @@ function createItemListManager(ITEM_LIST_PATH) {
 
   function loadNames() {
     try {
-      const jsonContent = JSON.parse(fs.readFileSync(ITEM_LIST_PATH, "utf8"));
+      const jsonContent = JSON.parse(fs.readFileSync(ITEM_LIST_PATH, 'utf8'));
       if (
         jsonContent &&
         jsonContent.items &&
@@ -18,45 +18,45 @@ function createItemListManager(ITEM_LIST_PATH) {
         for (const item of jsonContent.items) {
           itemBounds.set(item.name, {
             minBuyKeys:
-              typeof item.minBuyKeys === "number" ? item.minBuyKeys : undefined,
+              typeof item.minBuyKeys === 'number' ? item.minBuyKeys : undefined,
             minBuyMetal:
-              typeof item.minBuyMetal === "number"
+              typeof item.minBuyMetal === 'number'
                 ? item.minBuyMetal
                 : undefined,
             maxBuyKeys:
-              typeof item.maxBuyKeys === "number" ? item.maxBuyKeys : undefined,
+              typeof item.maxBuyKeys === 'number' ? item.maxBuyKeys : undefined,
             maxBuyMetal:
-              typeof item.maxBuyMetal === "number"
+              typeof item.maxBuyMetal === 'number'
                 ? item.maxBuyMetal
                 : undefined,
             minSellKeys:
-              typeof item.minSellKeys === "number"
+              typeof item.minSellKeys === 'number'
                 ? item.minSellKeys
                 : undefined,
             minSellMetal:
-              typeof item.minSellMetal === "number"
+              typeof item.minSellMetal === 'number'
                 ? item.minSellMetal
                 : undefined,
             maxSellKeys:
-              typeof item.maxSellKeys === "number"
+              typeof item.maxSellKeys === 'number'
                 ? item.maxSellKeys
                 : undefined,
             maxSellMetal:
-              typeof item.maxSellMetal === "number"
+              typeof item.maxSellMetal === 'number'
                 ? item.maxSellMetal
                 : undefined,
           });
         }
-        console.log("Updated allowed item names and bounds.");
+        console.log('Updated allowed item names and bounds.');
       }
     } catch (error) {
-      console.error("Error reading and updating allowed item names", error);
+      console.error('Error reading and updating allowed item names', error);
     }
   }
 
   function watchItemList() {
     const watcher = chokidar.watch(ITEM_LIST_PATH);
-    watcher.on("change", () => loadNames());
+    watcher.on('change', () => loadNames());
   }
 
   // Initial load

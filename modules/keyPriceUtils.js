@@ -18,21 +18,21 @@ async function insertKeyPrice(db, keyobj, buyPrice, sellPrice, timestamp) {
     await db.none(
       `INSERT INTO key_prices (sku, buy_price_metal, sell_price_metal, timestamp) 
             VALUES ($1, $2, $3, $4)`,
-      ["5021;6", buyPrice, sellPrice, timestamp],
+      ['5021;6', buyPrice, sellPrice, timestamp],
     );
   } catch (err) {
-    console.error("Error inserting key price");
+    console.error('Error inserting key price');
   }
 }
 
 async function cleanupOldKeyPrices(db) {
   try {
     await db.none(
-      `DELETE FROM key_prices WHERE created_at < NOW() - INTERVAL '30 days'`,
+      'DELETE FROM key_prices WHERE created_at < NOW() - INTERVAL \'30 days\'',
     );
-    console.log("Cleaned up key prices older than 30 days.");
+    console.log('Cleaned up key prices older than 30 days.');
   } catch (err) {
-    console.error("Error cleaning up old key prices");
+    console.error('Error cleaning up old key prices');
   }
 }
 
@@ -56,7 +56,7 @@ async function adjustPrice({
     const updatedItem = {
       name: name,
       sku: sku,
-      source: "bptf",
+      source: 'bptf',
       buy: {
         keys: 0,
         metal: newBuyPrice,
@@ -69,13 +69,13 @@ async function adjustPrice({
     };
 
     Methods.addToPricelist(updatedItem, PRICELIST_PATH);
-    socketIO.emit("price", updatedItem);
+    socketIO.emit('price', updatedItem);
 
     console.log(
       `Price for ${name} updated. Buy: ${newBuyPrice}, Sell: ${newSellPrice}`,
     );
   } catch (err) {
-    console.error("Error adjusting price");
+    console.error('Error adjusting price');
   }
 }
 
@@ -114,7 +114,7 @@ async function checkKeyPriceStability({
 
     if (buyA == null || sellA == null || buyB == null || sellB == null) {
       console.log(
-        "Not enough data in one of the 3-hour windows—skipping volatility check.",
+        'Not enough data in one of the 3-hour windows—skipping volatility check.',
       );
       return;
     }
@@ -145,12 +145,12 @@ async function checkKeyPriceStability({
       }
 
       await adjustPrice({
-        name: "Mann Co. Supply Crate Key",
-        sku: "5021;6",
+        name: 'Mann Co. Supply Crate Key',
+        sku: '5021;6',
         newBuyPrice: roundedBuy,
         newSellPrice: roundedSell,
         Methods,
-        PRICELIST_PATH: "./files/pricelist.json",
+        PRICELIST_PATH: './files/pricelist.json',
         socketIO,
       });
       return sendPriceAlert(
@@ -169,12 +169,12 @@ async function checkKeyPriceStability({
       }
 
       await adjustPrice({
-        name: "Mann Co. Supply Crate Key",
-        sku: "5021;6",
+        name: 'Mann Co. Supply Crate Key',
+        sku: '5021;6',
         newBuyPrice: roundedBuy,
         newSellPrice: roundedSell,
         Methods,
-        PRICELIST_PATH: "./files/pricelist.json",
+        PRICELIST_PATH: './files/pricelist.json',
         socketIO,
       });
       return sendPriceAlert(
@@ -190,12 +190,12 @@ async function checkKeyPriceStability({
       const roundedBuy = Methods.getRight(rawBuy);
       const roundedSell = Methods.getRight(rawSell);
       await adjustPrice({
-        name: "Mann Co. Supply Crate Key",
-        sku: "5021;6",
+        name: 'Mann Co. Supply Crate Key',
+        sku: '5021;6',
         newBuyPrice: roundedBuy,
         newSellPrice: roundedSell,
         Methods,
-        PRICELIST_PATH: "./files/pricelist.json",
+        PRICELIST_PATH: './files/pricelist.json',
         socketIO,
       });
       return sendPriceAlert(
@@ -208,19 +208,19 @@ async function checkKeyPriceStability({
     const roundedBuy = Methods.getRight(rawBuy);
 
     await adjustPrice({
-      name: "Mann Co. Supply Crate Key",
-      sku: "5021;6",
+      name: 'Mann Co. Supply Crate Key',
+      sku: '5021;6',
       newBuyPrice: roundedBuy,
       newSellPrice: roundedSell,
       Methods,
-      PRICELIST_PATH: "./files/pricelist.json",
+      PRICELIST_PATH: './files/pricelist.json',
       socketIO,
     });
     console.log(
       `Stable over last 6h (windows avg buy=${roundedBuy}, sell=${roundedSell}). Change delta for buy=${buyDelta} and change delta for sell=${sellDelta}`,
     );
   } catch (err) {
-    console.error("Error checking key price stability:", err);
+    console.error('Error checking key price stability:', err);
   }
 }
 

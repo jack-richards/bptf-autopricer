@@ -1,37 +1,37 @@
-const express = require("express");
-const path = require("path");
-const { loadJson } = require("../utils");
-const renderPage = require("../layout");
+const express = require('express');
+const path = require('path');
+const { loadJson } = require('../utils');
+const renderPage = require('../layout');
 
 module.exports = function (app, config) {
   const router = express.Router();
 
-  const CONFIG_PATH = path.resolve(__dirname, "../../pricerConfig.json");
+  const CONFIG_PATH = path.resolve(__dirname, '../../pricerConfig.json');
   const thresholdSec = config.ageThresholdSec;
 
-  const pricelistPath = path.resolve(__dirname, "../../files/pricelist.json");
+  const pricelistPath = path.resolve(__dirname, '../../files/pricelist.json');
   const sellingPricelistPath = path.resolve(
     __dirname,
     config.tf2AutobotDir,
     config.botTradingDir,
-    "pricelist.json",
+    'pricelist.json',
   );
-  const itemListPath = path.resolve(__dirname, "../../files/item_list.json");
+  const itemListPath = path.resolve(__dirname, '../../files/item_list.json');
 
   function buildTable(items, showAge, sell) {
     items.sort((a, b) => a.name.localeCompare(b.name));
     let tbl =
-      "<table><thead><tr>" +
-      "<th>Name</th><th>SKU</th><th>Last Updated</th>" +
-      (showAge ? "<th>Age (h)</th>" : "") +
-      "<th>Buy</th><th>Sell</th><th>In Bot</th><th>Action</th>" +
-      "</tr></thead><tbody>";
+      '<table><thead><tr>' +
+      '<th>Name</th><th>SKU</th><th>Last Updated</th>' +
+      (showAge ? '<th>Age (h)</th>' : '') +
+      '<th>Buy</th><th>Sell</th><th>In Bot</th><th>Action</th>' +
+      '</tr></thead><tbody>';
 
     items.forEach((item) => {
       const last = new Date(item.time * 1000).toLocaleString();
       const ageH = (item.age / 3600).toFixed(2);
-      const buyUnit = item.buy.keys === 1 ? "Key" : "Keys";
-      const sellUnit = item.sell.keys === 1 ? "Key" : "Keys";
+      const buyUnit = item.buy.keys === 1 ? 'Key' : 'Keys';
+      const sellUnit = item.sell.keys === 1 ? 'Key' : 'Keys';
       const inBot = item.inSelling;
       const sku = item.sku;
       const currentSell = sell[sku];
@@ -41,47 +41,47 @@ module.exports = function (app, config) {
 		<input type="number" id="min-${sku}" value="${defaultMin}" style="width: 40px;">
 		<input type="number" id="max-${sku}" value="${defaultMax}" style="width: 40px;">
 		${
-      inBot
-        ? `<button onclick="queueAction('remove','${sku}')">❌</button>
+  inBot
+    ? `<button onclick="queueAction('remove','${sku}')">❌</button>
 				<button onclick="queueEdit('${sku}')">✏️</button>`
-        : `<button onclick="queueAction('add','${sku}')">✅</button>`
-    }
+    : `<button onclick="queueAction('add','${sku}')">✅</button>`
+}
 		`;
 
       const rowClass = showAge
         ? item.age > 2 * 24 * 3600
-          ? "outdated-2d"
+          ? 'outdated-2d'
           : item.age > 24 * 3600
-            ? "outdated-1d"
-            : "outdated-2h"
-        : "current-row";
+            ? 'outdated-1d'
+            : 'outdated-2h'
+        : 'current-row';
 
       tbl +=
         `<tr class="${rowClass}" data-age="${item.age}" data-inbot="${inBot}">` +
         `<td class="name">${item.name}</td>` +
         `<td class="sku">${sku}</td>` +
         `<td>${last}</td>` +
-        (showAge ? `<td>${ageH}</td>` : "") +
+        (showAge ? `<td>${ageH}</td>` : '') +
         `<td>${item.buy.keys} ${buyUnit} & ${item.buy.metal} Refined</td>` +
         `<td>${item.sell.keys} ${sellUnit} & ${item.sell.metal} Refined</td>` +
-        `<td>${inBot ? "✓" : "✗"}</td>` +
+        `<td>${inBot ? '✓' : '✗'}</td>` +
         `<td>${actionBtn}</td></tr>`;
     });
-    return tbl + "</tbody></table>";
+    return tbl + '</tbody></table>';
   }
 
   function buildMissingTable(names) {
     names.sort();
     let tbl =
-      "<table><thead><tr><th>Name</th><th>Action</th></tr></thead><tbody>";
+      '<table><thead><tr><th>Name</th><th>Action</th></tr></thead><tbody>';
     names.forEach((name) => {
       tbl +=
-        `<tr data-age="0" data-inbot="false">` +
+        '<tr data-age="0" data-inbot="false">' +
         `<td class="name">${name}</td>` +
         `<td><button onclick="queueAction('addName', '${encodeURIComponent(name)}')">✅</button></td>` +
-        `</tr>`;
+        '</tr>';
     });
-    return tbl + "</tbody></table>";
+    return tbl + '</tbody></table>';
   }
 
   function loadData() {
@@ -105,7 +105,7 @@ module.exports = function (app, config) {
     return { outdated, current, missing, sell };
   }
 
-  router.get("/", (req, res) => {
+  router.get('/', (req, res) => {
     const { outdated, current, missing, sell } = loadData();
     const html = `
 		<div class="controls">
@@ -234,7 +234,7 @@ module.exports = function (app, config) {
 		</script>
 	  `;
 
-    res.send(renderPage("Pricelist Status", html));
+    res.send(renderPage('Pricelist Status', html));
   });
-  app.use("/", router); // Mount the router to root path
+  app.use('/', router); // Mount the router to root path
 };
