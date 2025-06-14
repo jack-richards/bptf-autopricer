@@ -75,7 +75,7 @@ function initBptfWebSocket({
               !excludedListingDescriptions.some((detail) =>
                 new RegExp(`\\b${detail}\\b`, 'i').test(
                   listingDetails.normalize('NFKD').toLowerCase().trim()
-                )
+                ),
               )
             ) {
               try {

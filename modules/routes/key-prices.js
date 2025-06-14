@@ -95,7 +95,7 @@ module.exports = (app, config) => {
           </script>
         </body>
       `
-        )
+        ),
       );
     } catch (err) {
       console.error('Failed to load key prices:', err);
