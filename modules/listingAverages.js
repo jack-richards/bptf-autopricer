@@ -16,8 +16,7 @@ async function updateMovingAverages(db, pgp, alpha = 0.35) {
   // - are rounded to 2 decimal places (e.g., 1.2345 -> 1.23)
   // - never go below the minimum value (default 0.05, which is already very small for item averages)
   // This prevents extremely small values that could cause database errors with float columns.
-  const clampAndRound = (val, min = 0.05) =>
-    Math.max(min, Math.round(val * 100) / 100);
+  const clampAndRound = (val, min = 0.05) => Math.max(min, Math.round(val * 100) / 100);
 
   const updates = stats
     .map((row) => {
@@ -27,8 +26,7 @@ async function updateMovingAverages(db, pgp, alpha = 0.35) {
       // Calculate new averages
       let newAvg = alpha * row.current_count + (1 - alpha) * prevAvg;
       let newBuyAvg = alpha * row.current_buy_count + (1 - alpha) * prevBuyAvg;
-      let newSellAvg =
-        alpha * row.current_sell_count + (1 - alpha) * prevSellAvg;
+      let newSellAvg = alpha * row.current_sell_count + (1 - alpha) * prevSellAvg;
       // Clamp and round to 2 decimals, minimum 0.05
       newAvg = clampAndRound(newAvg);
       newBuyAvg = clampAndRound(newBuyAvg);
@@ -43,16 +41,11 @@ async function updateMovingAverages(db, pgp, alpha = 0.35) {
     .filter((u) => {
       const orig = stats.find((r) => r.sku === u.sku);
       return (
+        Math.abs((orig.moving_avg_count ?? orig.current_count) - u.moving_avg_count) > 1e-6 ||
+        Math.abs((orig.moving_avg_buy_count ?? orig.current_buy_count) - u.moving_avg_buy_count) >
+          1e-6 ||
         Math.abs(
-          (orig.moving_avg_count ?? orig.current_count) - u.moving_avg_count,
-        ) > 1e-6 ||
-        Math.abs(
-          (orig.moving_avg_buy_count ?? orig.current_buy_count) -
-            u.moving_avg_buy_count,
-        ) > 1e-6 ||
-        Math.abs(
-          (orig.moving_avg_sell_count ?? orig.current_sell_count) -
-            u.moving_avg_sell_count,
+          (orig.moving_avg_sell_count ?? orig.current_sell_count) - u.moving_avg_sell_count,
         ) > 1e-6
       );
     });
@@ -63,12 +56,7 @@ async function updateMovingAverages(db, pgp, alpha = 0.35) {
   }
 
   const cs = new pgp.helpers.ColumnSet(
-    [
-      'sku',
-      'moving_avg_count',
-      'moving_avg_buy_count',
-      'moving_avg_sell_count',
-    ],
+    ['sku', 'moving_avg_count', 'moving_avg_buy_count', 'moving_avg_sell_count'],
     { table: 'tmp' },
   );
   const values = pgp.helpers.values(updates, cs);

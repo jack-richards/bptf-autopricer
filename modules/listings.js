@@ -1,8 +1,5 @@
 const getListings = async (db, name, intent) => {
-  return await db.result(
-    'SELECT * FROM listings WHERE name = $1 AND intent = $2',
-    [name, intent],
-  );
+  return await db.result('SELECT * FROM listings WHERE name = $1 AND intent = $2', [name, intent]);
 };
 
 const insertListing = async (
@@ -20,26 +17,13 @@ const insertListing = async (
          VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (name, sku, intent, steamid)
          DO UPDATE SET currencies = $3, updated = $5;`,
-    [
-      response_item.name,
-      sku,
-      JSON.stringify(currencies),
-      intent,
-      timestamp,
-      steamid,
-    ],
+    [response_item.name, sku, JSON.stringify(currencies), intent, timestamp, steamid],
   );
   await updateListingStats(db, sku);
   return result;
 };
 
-const deleteRemovedListing = async (
-  db,
-  updateListingStats,
-  steamid,
-  name,
-  intent,
-) => {
+const deleteRemovedListing = async (db, updateListingStats, steamid, name, intent) => {
   const sku = (
     await db.oneOrNone(
       'SELECT sku FROM listings WHERE steamid = $1 AND name = $2 AND intent = $3 LIMIT 1',

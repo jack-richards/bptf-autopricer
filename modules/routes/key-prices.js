@@ -14,19 +14,14 @@ module.exports = (app, config) => {
         ORDER BY created_at ASC
       `);
 
-      const timestamps = data.map((p) =>
-        new Date(p.timestamp * 1000).toLocaleString(),
-      );
+      const timestamps = data.map((p) => new Date(p.timestamp * 1000).toLocaleString());
       const buyPrices = data.map((p) => parseFloat(p.buy_price_metal));
       const sellPrices = data.map((p) => parseFloat(p.sell_price_metal));
 
       const mean = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
       const stdDev = (arr) => {
         const avg = mean(arr);
-        return Math.sqrt(
-          arr.map((x) => Math.pow(x - avg, 2)).reduce((a, b) => a + b) /
-            arr.length,
-        );
+        return Math.sqrt(arr.map((x) => Math.pow(x - avg, 2)).reduce((a, b) => a + b) / arr.length);
       };
 
       const stats = {

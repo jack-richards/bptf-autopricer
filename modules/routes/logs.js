@@ -5,11 +5,7 @@ const renderPage = require('../layout');
 const LOG_FILES = ['bptf-autopricer-out.log', 'bptf-autopricer-error.log'];
 
 module.exports = (app, config) => {
-  const pm2LogDir = path.join(
-    process.env.HOME || process.env.USERPROFILE,
-    '.pm2',
-    'logs',
-  );
+  const pm2LogDir = path.join(process.env.HOME || process.env.USERPROFILE, '.pm2', 'logs');
 
   app.get('/logs', (req, res) => {
     const file = req.query.file || 'bptf-autopricer-out.log';

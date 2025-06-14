@@ -10,16 +10,12 @@ const config = require('./config.json');
 const CACHE_FILE_PATH = path.resolve(__dirname, 'cached-pricelist.json');
 
 Methods.prototype.halfScrapToRefined = function (halfscrap) {
-  var refined = parseFloat(
-    (halfscrap / 18).toString().match(/^-?\d+(?:\.\d{0,2})?/)[0],
-  );
+  var refined = parseFloat((halfscrap / 18).toString().match(/^-?\d+(?:\.\d{0,2})?/)[0]);
   return refined;
 };
 
 Methods.prototype.refinedToHalfScrap = function (refined) {
-  var halfScrap = parseFloat(
-    (refined * 18).toString().match(/^-?\d+(?:\.\d{0,2})?/)[0],
-  );
+  var halfScrap = parseFloat((refined * 18).toString().match(/^-?\d+(?:\.\d{0,2})?/)[0]);
   return halfScrap;
 };
 
@@ -69,10 +65,7 @@ Methods.prototype.calculatePercentageDifference = function (value1, value2) {
   return ((value2 - value1) / Math.abs(value1)) * 100;
 };
 
-Methods.prototype.getItemPriceFromExternalPricelist = function (
-  sku,
-  external_pricelist,
-) {
+Methods.prototype.getItemPriceFromExternalPricelist = function (sku, external_pricelist) {
   let items = external_pricelist.items;
 
   for (const item of items) {
@@ -127,10 +120,7 @@ Methods.prototype.calculatePricingAPIDifferences = function (
   );
 
   // Ensures that data we're going to use in comparison are numbers. If not we throw an error.
-  if (
-    isNaN(percentageDifferences.buyDifference) ||
-    isNaN(percentageDifferences.sellDifference)
-  ) {
+  if (isNaN(percentageDifferences.buyDifference) || isNaN(percentageDifferences.sellDifference)) {
     // Can't compare percentages because the external API likely returned malformed data.
     throw new Error('External API returned NaN. Critical error.');
   }
@@ -154,13 +144,9 @@ Methods.prototype.validatePrice = function (percentageDifferences) {
 
   // A greater percentage difference for buying, means that our pricer is buying for more than prices.tf.
   // A lesser percentage difference for selling, means that our pricer is selling for less than prices.tf.
-  if (
-    percentageDifferences.buyDifference > config.maxPercentageDifferences.buy
-  ) {
+  if (percentageDifferences.buyDifference > config.maxPercentageDifferences.buy) {
     throw new Error('Autopricer is buying for too much.');
-  } else if (
-    percentageDifferences.sellDifference < config.maxPercentageDifferences.sell
-  ) {
+  } else if (percentageDifferences.sellDifference < config.maxPercentageDifferences.sell) {
     throw new Error('Autopricer is selling for too cheap.');
   }
   return true;
@@ -235,9 +221,7 @@ Methods.prototype.addToPricelist = function (item, PRICELIST_PATH) {
         return;
       }
 
-      const existingIndex = items.findIndex(
-        (pricelist_item) => pricelist_item.sku === item.sku,
-      );
+      const existingIndex = items.findIndex((pricelist_item) => pricelist_item.sku === item.sku);
 
       if (existingIndex !== -1) {
         items[existingIndex] = item;
@@ -263,16 +247,13 @@ Methods.prototype.getListingsFromSnapshots = async function (name) {
   try {
     // Endpoint is limited to 1 request per 60 seconds.
     await this.waitXSeconds(1);
-    const response = await axios.get(
-      'https://backpack.tf/api/classifieds/listings/snapshot',
-      {
-        params: {
-          sku: name,
-          appid: 440,
-          token: config.bptfToken,
-        },
+    const response = await axios.get('https://backpack.tf/api/classifieds/listings/snapshot', {
+      params: {
+        sku: name,
+        appid: 440,
+        token: config.bptfToken,
       },
-    );
+    });
     if (response.status === 200) {
       const listings = response.data.listings;
       return listings;
@@ -308,17 +289,13 @@ Methods.prototype.getJWTFromPricesTF = async function (page, limit) {
         // Retry in 60 seconds.
         await this.waitXSeconds(60);
       }
-      console.log(
-        'Error occurred getting auth token from prices.tf, retrying...',
-      );
+      console.log('Error occurred getting auth token from prices.tf, retrying...');
     }
 
     tries++;
   }
 
-  throw new Error(
-    'An error occurred while getting authenticated with Prices.tf',
-  );
+  throw new Error('An error occurred while getting authenticated with Prices.tf');
 };
 
 Methods.prototype.getKeyPriceFromPricesTF = async function () {
@@ -327,15 +304,10 @@ Methods.prototype.getKeyPriceFromPricesTF = async function () {
 
     let tries = 1;
     while (tries <= 5) {
-      const response = await axios.get(
-        'https://api2.prices.tf/prices/5021;6',
-        axiosConfig,
-      );
+      const response = await axios.get('https://api2.prices.tf/prices/5021;6', axiosConfig);
 
       if (response.status === 200) {
-        const sellMetal = Methods.halfScrapToRefined(
-          response.data.sellHalfScrap,
-        );
+        const sellMetal = Methods.halfScrapToRefined(response.data.sellHalfScrap);
         return {
           metal: sellMetal,
         };
@@ -360,24 +332,17 @@ Methods.prototype.getKeyFromExternalAPI = async function () {
 
     let tries = 1;
     while (tries <= 5) {
-      const response = await axios.get(
-        'https://api2.prices.tf/prices/5021;6',
-        axiosConfig,
-      );
+      const response = await axios.get('https://api2.prices.tf/prices/5021;6', axiosConfig);
 
       if (response.status === 200) {
         key_object.name = 'Mann Co. Supply Crate Key';
         key_object.sku = '5021;6';
         key_object.source = 'bptf';
 
-        let buyKeys = Object.is(response.data.buyKeys, undefined)
-          ? 0
-          : response.data.buyKeys;
+        let buyKeys = Object.is(response.data.buyKeys, undefined) ? 0 : response.data.buyKeys;
 
         let buyMetal = this.halfScrapToRefined(
-          Object.is(response.data.buyHalfScrap, undefined)
-            ? 0
-            : response.data.buyHalfScrap,
+          Object.is(response.data.buyHalfScrap, undefined) ? 0 : response.data.buyHalfScrap,
         );
 
         buyMetal = this.getRight(buyMetal);
@@ -387,14 +352,10 @@ Methods.prototype.getKeyFromExternalAPI = async function () {
           metal: buyMetal,
         };
 
-        let sellKeys = Object.is(response.data.sellKeys, undefined)
-          ? 0
-          : response.data.sellKeys;
+        let sellKeys = Object.is(response.data.sellKeys, undefined) ? 0 : response.data.sellKeys;
 
         let sellMetal = this.halfScrapToRefined(
-          Object.is(response.data.sellHalfScrap, undefined)
-            ? 0
-            : response.data.sellHalfScrap,
+          Object.is(response.data.sellHalfScrap, undefined) ? 0 : response.data.sellHalfScrap,
         );
 
         sellMetal = this.getRight(sellMetal);
@@ -425,30 +386,18 @@ Methods.prototype.getKeyFromExternalAPI = async function () {
 Methods.prototype.getExternalPricelist = async function () {
   try {
     const response = await axios.get('https://autobot.tf/json/pricelist-array');
-    if (
-      !response.data ||
-      !Array.isArray(response.data.items) ||
-      response.data.items.length === 0
-    ) {
+    if (!response.data || !Array.isArray(response.data.items) || response.data.items.length === 0) {
       throw new Error('No items in external pricelist.');
     }
     // Cache the fetched pricelist to file
     try {
-      await fs.promises.writeFile(
-        CACHE_FILE_PATH,
-        JSON.stringify(response.data, null, 2),
-        'utf-8',
-      );
+      await fs.promises.writeFile(CACHE_FILE_PATH, JSON.stringify(response.data, null, 2), 'utf-8');
     } catch (writeErr) {
-      console.warn(
-        `Failed to write cache file at ${CACHE_FILE_PATH}: ${writeErr.message}`,
-      );
+      console.warn(`Failed to write cache file at ${CACHE_FILE_PATH}: ${writeErr.message}`);
     }
     return response.data;
   } catch (err) {
-    console.warn(
-      `Could not fetch external pricelist, falling back to cache: ${err.message}`,
-    );
+    console.warn(`Could not fetch external pricelist, falling back to cache: ${err.message}`);
     try {
       const cached = await fs.promises.readFile(CACHE_FILE_PATH, 'utf-8');
       const data = JSON.parse(cached);

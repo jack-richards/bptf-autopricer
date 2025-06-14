@@ -72,8 +72,7 @@ module.exports = function (app, config) {
 
   function buildMissingTable(names) {
     names.sort();
-    let tbl =
-      '<table><thead><tr><th>Name</th><th>Action</th></tr></thead><tbody>';
+    let tbl = '<table><thead><tr><th>Name</th><th>Action</th></tr></thead><tbody>';
     names.forEach((name) => {
       tbl +=
         '<tr data-age="0" data-inbot="false">' +

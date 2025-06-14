@@ -14,8 +14,7 @@ module.exports = function (app, config) {
     'polldata.json',
   );
   const pricelistPath = path.resolve(__dirname, '../../files/pricelist.json');
-  const keyPrice = loadJson(pricelistPath).items.find((i) => i.sku === '5021;6')
-    ?.sell?.metal;
+  const keyPrice = loadJson(pricelistPath).items.find((i) => i.sku === '5021;6')?.sell?.metal;
 
   router.get('/pnl', (req, res) => {
     let parsed;
@@ -23,14 +22,10 @@ module.exports = function (app, config) {
       const raw = fs.readFileSync(pollDataPath, 'utf8');
       parsed = JSON.parse(raw);
     } catch (e) {
-      return res
-        .status(500)
-        .send(renderPage('P&L Dashboard', '<p>Error loading trade data.</p>'));
+      return res.status(500).send(renderPage('P&L Dashboard', '<p>Error loading trade data.</p>'));
     }
 
-    const history = Object.values(parsed.offerData || {}).filter(
-      (t) => t.isAccepted,
-    );
+    const history = Object.values(parsed.offerData || {}).filter((t) => t.isAccepted);
     const summary = {};
     const profitPoints = [];
     let totalProfit = 0;
@@ -71,15 +66,11 @@ module.exports = function (app, config) {
 
       const timeISO = date.toISOString();
 
-      const skuList = Object.entries(t.dict?.our || {}).concat(
-        Object.entries(t.dict?.their || {}),
-      );
+      const skuList = Object.entries(t.dict?.our || {}).concat(Object.entries(t.dict?.their || {}));
       const valueOur = t.value?.our || { keys: 0, metal: 0 };
       const valueTheir = t.value?.their || { keys: 0, metal: 0 };
       const profit =
-        valueTheir.keys * keyPrice +
-        valueTheir.metal -
-        (valueOur.keys * keyPrice + valueOur.metal);
+        valueTheir.keys * keyPrice + valueTheir.metal - (valueOur.keys * keyPrice + valueOur.metal);
       totalProfit += profit;
 
       profitPoints.push({ x: timeISO, y: parseFloat(totalProfit.toFixed(2)) });

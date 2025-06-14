@@ -16,8 +16,7 @@ module.exports = function (app, config) {
     );
     const pricelistPath = path.resolve(__dirname, '../../files/pricelist.json');
     const pricelist = loadJson(pricelistPath);
-    const keyPrice =
-      pricelist.items.find((i) => i.sku === '5021;6')?.sell?.metal || 68.11;
+    const keyPrice = pricelist.items.find((i) => i.sku === '5021;6')?.sell?.metal || 68.11;
 
     const currencyMap = {
       '5000;6': 'Scrap Metal',
@@ -27,9 +26,7 @@ module.exports = function (app, config) {
     };
     const skuToName = {
       ...currencyMap,
-      ...Object.fromEntries(
-        pricelist.items.map((item) => [item.sku, item.name]),
-      ),
+      ...Object.fromEntries(pricelist.items.map((item) => [item.sku, item.name])),
     };
 
     let trades = [];
@@ -41,15 +38,13 @@ module.exports = function (app, config) {
 
       trades = Object.entries(data)
         .map(([id, trade]) => {
-          const accepted =
-            trade.action?.action === 'accept' || trade.isAccepted;
+          const accepted = trade.action?.action === 'accept' || trade.isAccepted;
           const profileUrl = trade.partner
             ? `https://steamcommunity.com/profiles/${trade.partner}`
             : '#';
           const name = trade.partner || 'Unknown';
           const timeRaw = trade.time || trade.actionTimestamp || Date.now();
-          const timestamp =
-            timeRaw > 2000000000 ? new Date(timeRaw) : new Date(timeRaw * 1000);
+          const timestamp = timeRaw > 2000000000 ? new Date(timeRaw) : new Date(timeRaw * 1000);
           const time = timestamp.toLocaleString();
 
           const itemsOur = trade.dict?.our || {};
@@ -112,16 +107,12 @@ module.exports = function (app, config) {
         <td><a href="${t.profileUrl}" target="_blank">${t.id}</a><br><small>${t.name}</small></td>
         <td>${t.time}</td>
         <td><strong>Sent:</strong><br>${Object.entries(t.itemsOur)
-    .map(
-      ([sku, qty]) => `${qty}× ${skuToName[sku] || 'Unknown'} (${sku})`,
-    )
+    .map(([sku, qty]) => `${qty}× ${skuToName[sku] || 'Unknown'} (${sku})`)
     .join('<br>')}<br>
           <strong>Value:</strong> ${t.valueOur.keys} Keys, ${t.valueOur.metal} Ref
         </td>
         <td><strong>Received:</strong><br>${Object.entries(t.itemsTheir)
-    .map(
-      ([sku, qty]) => `${qty}× ${skuToName[sku] || 'Unknown'} (${sku})`,
-    )
+    .map(([sku, qty]) => `${qty}× ${skuToName[sku] || 'Unknown'} (${sku})`)
     .join('<br>')}<br>
           <strong>Value:</strong> ${t.valueTheir.keys} Keys, ${t.valueTheir.metal} Ref
         </td>

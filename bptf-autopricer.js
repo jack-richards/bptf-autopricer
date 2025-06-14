@@ -117,10 +117,7 @@ const updateKeyObject = async () => {
     const externalPricelist = await Methods.getExternalPricelist();
 
     // 2b) grab the item with the same SKU
-    const { pricetfItem } = Methods.getItemPriceFromExternalPricelist(
-      '5021;6',
-      externalPricelist,
-    );
+    const { pricetfItem } = Methods.getItemPriceFromExternalPricelist('5021;6', externalPricelist);
 
     // 2c) reshape to match the key_item interface
     key_item = {
@@ -154,8 +151,7 @@ const { initBptfWebSocket } = require('./websocket/bptfWebSocket');
 // Load item names and bounds from item_list.json
 const createItemListManager = require('./modules/itemList');
 const itemListManager = createItemListManager(ITEM_LIST_PATH);
-const { loadNames, watchItemList, getAllowedItemNames, getItemBounds } =
-  itemListManager;
+const { loadNames, watchItemList, getAllowedItemNames, getItemBounds } = itemListManager;
 watchItemList();
 
 const calculateAndEmitPrices = async () => {
@@ -179,9 +175,7 @@ const calculateAndEmitPrices = async () => {
         (item.buy.keys === 0 && item.buy.metal === 0) ||
         (item.sell.keys === 0 && item.sell.metal === 0)
       ) {
-        throw new Error(
-          'Autobot cache of prices.tf pricelist has marked item with price of 0.',
-        );
+        throw new Error('Autobot cache of prices.tf pricelist has marked item with price of 0.');
       }
 
       // If it's a key (sku 5021;6), insert the price into the key_prices table
@@ -285,10 +279,8 @@ async function isPriceSwingAcceptable(prev, next, sku) {
     return true;
   } // No history, allow
 
-  const avgBuy =
-    history.reduce((sum, p) => sum + Number(p.buy_metal), 0) / history.length;
-  const avgSell =
-    history.reduce((sum, p) => sum + Number(p.sell_metal), 0) / history.length;
+  const avgBuy = history.reduce((sum, p) => sum + Number(p.buy_metal), 0) / history.length;
+  const avgSell = history.reduce((sum, p) => sum + Number(p.sell_metal), 0) / history.length;
 
   const nextBuy = Methods.toMetal(next.buy, keyobj.metal);
   const nextSell = Methods.toMetal(next.sell, keyobj.metal);
@@ -317,9 +309,7 @@ const determinePrice = async (name, sku) => {
   try {
     data = Methods.getItemPriceFromExternalPricelist(sku, external_pricelist);
   } catch (e) {
-    throw new Error(
-      `| UPDATING PRICES |: Couldn't price ${name}. Issue with Prices.tf.`,
-    );
+    throw new Error(`| UPDATING PRICES |: Couldn't price ${name}. Issue with Prices.tf.`);
   }
 
   var pricetfItem = data.pricetfItem;
@@ -426,26 +416,17 @@ const calculateZScore = (value, mean, stdDev) => {
 
 const filterOutliers = (listingsArray) => {
   // Calculate mean and standard deviation of listings.
-  const prices = listingsArray.map((listing) =>
-    Methods.toMetal(listing.currencies, keyobj.metal),
-  );
-  const mean = Methods.getRight(
-    prices.reduce((acc, curr) => acc + curr, 0) / prices.length,
-  );
+  const prices = listingsArray.map((listing) => Methods.toMetal(listing.currencies, keyobj.metal));
+  const mean = Methods.getRight(prices.reduce((acc, curr) => acc + curr, 0) / prices.length);
   const stdDev = Math.sqrt(
-    prices.reduce((acc, curr) => acc + Math.pow(curr - mean, 2), 0) /
-      prices.length,
+    prices.reduce((acc, curr) => acc + Math.pow(curr - mean, 2), 0) / prices.length,
   );
 
   // Filter out listings that are 3 standard deviations away from the mean.
   // To put it plainly, we're filtering out listings that are paying either
   // too little or too much compared to the mean.
   const filteredListings = listingsArray.filter((listing) => {
-    const zScore = calculateZScore(
-      Methods.toMetal(listing.currencies, keyobj.metal),
-      mean,
-      stdDev,
-    );
+    const zScore = calculateZScore(Methods.toMetal(listing.currencies, keyobj.metal), mean, stdDev);
     return zScore <= 3 && zScore >= -3;
   });
 
@@ -457,10 +438,7 @@ const filterOutliers = (listingsArray) => {
   // trusted steamids (when applicable).
   var filteredMean = 0;
   for (var i = 0; i <= 2; i++) {
-    filteredMean += +Methods.toMetal(
-      filteredListings[i].currencies,
-      keyobj.metal,
-    );
+    filteredMean += +Methods.toMetal(filteredListings[i].currencies, keyobj.metal);
   }
   filteredMean /= 3;
 
@@ -485,9 +463,7 @@ const getAverages = (name, buyFiltered, sellFiltered, sku, pricetfItem) => {
 
   try {
     if (buyFiltered.length < 3) {
-      throw new Error(
-        `| UPDATING PRICES |: ${name} not enough buy listings...`,
-      );
+      throw new Error(`| UPDATING PRICES |: ${name} not enough buy listings...`);
     } else if (buyFiltered.length > 3 && buyFiltered.length < 10) {
       var totalValue = {
         keys: 0,
@@ -500,10 +476,7 @@ const getAverages = (name, buyFiltered, sellFiltered, sku, pricetfItem) => {
           ? 0
           : buyFiltered[i].currencies.keys;
         // If the metal value is undefined, we set it to 0.
-        totalValue.metal += Object.is(
-          buyFiltered[i].currencies.metal,
-          undefined,
-        )
+        totalValue.metal += Object.is(buyFiltered[i].currencies.metal, undefined)
           ? 0
           : buyFiltered[i].currencies.metal;
       }
@@ -531,16 +504,11 @@ const getAverages = (name, buyFiltered, sellFiltered, sku, pricetfItem) => {
       final_sellObj.keys = Object.is(sellFiltered[0].currencies.keys, undefined)
         ? 0
         : sellFiltered[0].currencies.keys;
-      final_sellObj.metal = Object.is(
-        sellFiltered[0].currencies.metal,
-        undefined,
-      )
+      final_sellObj.metal = Object.is(sellFiltered[0].currencies.metal, undefined)
         ? 0
         : sellFiltered[0].currencies.metal;
     } else {
-      throw new Error(
-        `| UPDATING PRICES |: ${name} not enough sell listings...`,
-      ); // Not enough
+      throw new Error(`| UPDATING PRICES |: ${name} not enough sell listings...`); // Not enough
     }
 
     var usePrices = false;
@@ -608,9 +576,7 @@ const finalisePrice = async (arr, name, sku) => {
       console.log(
         `| UPDATING PRICES |:${name} couldn't be updated. CRITICAL, something went wrong in the getAverages logic.`,
       );
-      throw new Error(
-        'Something went wrong in the getAverages() logic. DEVELOPER LOOK AT THIS.',
-      );
+      throw new Error('Something went wrong in the getAverages() logic. DEVELOPER LOOK AT THIS.');
       // Will ensure that neither the buy, nor sell side is completely unpriced. If it is, this means we couldn't get
       // enough listings to create a price, and we also somehow bypassed our prices.tf safety check. So instead, we
       // just skip this item, disregarding the price.
@@ -672,17 +638,9 @@ const finalisePrice = async (arr, name, sku) => {
       // Clamp the buy and sell prices to the bounds set in the config.
       // If the bounds are not set, it will just use the default values of 0 and Infinity.
       arr[0].keys = clamp(arr[0].keys, bounds.minBuyKeys, bounds.maxBuyKeys);
-      arr[0].metal = clamp(
-        arr[0].metal,
-        bounds.minBuyMetal,
-        bounds.maxBuyMetal,
-      );
+      arr[0].metal = clamp(arr[0].metal, bounds.minBuyMetal, bounds.maxBuyMetal);
       arr[1].keys = clamp(arr[1].keys, bounds.minSellKeys, bounds.maxSellKeys);
-      arr[1].metal = clamp(
-        arr[1].metal,
-        bounds.minSellMetal,
-        bounds.maxSellMetal,
-      );
+      arr[1].metal = clamp(arr[1].metal, bounds.minSellMetal, bounds.maxSellMetal);
 
       // Load previous price from pricelist if available
       const pricelist = JSON.parse(fs.readFileSync(PRICELIST_PATH, 'utf8'));
@@ -694,9 +652,7 @@ const finalisePrice = async (arr, name, sku) => {
         const nextObj = { buy: item.buy, sell: item.sell };
         const swingOk = await isPriceSwingAcceptable(prevObj, nextObj, sku);
         if (!swingOk) {
-          console.log(
-            `Price swing too large for ${name} (${sku}), skipping update.`,
-          );
+          console.log(`Price swing too large for ${name} (${sku}), skipping update.`);
           return;
         }
       }
@@ -704,11 +660,7 @@ const finalisePrice = async (arr, name, sku) => {
       // Save to price history
       await db.none(
         'INSERT INTO price_history (sku, buy_metal, sell_metal, timestamp) VALUES ($1, $2, $3, NOW())',
-        [
-          sku,
-          Methods.toMetal(item.buy, keyobj.metal),
-          Methods.toMetal(item.sell, keyobj.metal),
-        ],
+        [sku, Methods.toMetal(item.buy, keyobj.metal), Methods.toMetal(item.sell, keyobj.metal)],
       );
 
       // Return the new item object with the latest price.
@@ -726,8 +678,7 @@ const rws = initBptfWebSocket({
   schemaManager,
   Methods,
   insertListing: (...args) => insertListing(db, updateListingStats, ...args),
-  deleteRemovedListing: (...args) =>
-    deleteRemovedListing(db, updateListingStats, ...args),
+  deleteRemovedListing: (...args) => deleteRemovedListing(db, updateListingStats, ...args),
   excludedSteamIds,
   excludedListingDescriptions,
   blockedAttributes,

@@ -74,8 +74,7 @@ module.exports = function (app, config) {
       if (item) {
         for (const field of fields) {
           const val = req.body[`${field}_${i}`];
-          item[field] =
-            val !== '' && val !== undefined ? parseFloat(val) : undefined;
+          item[field] = val !== '' && val !== undefined ? parseFloat(val) : undefined;
         }
       }
     }

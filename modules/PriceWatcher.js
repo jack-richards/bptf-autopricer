@@ -21,9 +21,7 @@ function checkOldPrices(pricelistPath, ageThresholdSec = 2 * 3600) {
     }
 
     const now = Math.floor(Date.now() / 1000);
-    const oldItems = json.items.filter(
-      (item) => now - item.time > ageThresholdSec,
-    );
+    const oldItems = json.items.filter((item) => now - item.time > ageThresholdSec);
     const totalItems = json.items;
 
     if (oldItems.length > 0) {

@@ -33,11 +33,7 @@ const DEFAULTS = {
 
 function deepMerge(target, src) {
   for (const key in src) {
-    if (
-      typeof src[key] === 'object' &&
-      src[key] !== null &&
-      !Array.isArray(src[key])
-    ) {
+    if (typeof src[key] === 'object' && src[key] !== null && !Array.isArray(src[key])) {
       if (!target[key]) {
         target[key] = {};
       }
@@ -53,13 +49,7 @@ function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
 
-const REQUIRED_FIELDS = [
-  'bptfAPIKey',
-  'bptfToken',
-  'steamAPIKey',
-  'database',
-  'pricerPort',
-];
+const REQUIRED_FIELDS = ['bptfAPIKey', 'bptfToken', 'steamAPIKey', 'database', 'pricerPort'];
 
 function validateConfig(configPath) {
   let config = JSON.parse(fs.readFileSync(configPath, 'utf8'));

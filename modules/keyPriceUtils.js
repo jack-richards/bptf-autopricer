@@ -8,9 +8,7 @@ async function insertKeyPrice(db, keyobj, buyPrice, sellPrice, timestamp) {
     sellPrice < lowerBound ||
     sellPrice > upperBound
   ) {
-    console.warn(
-      `Abnormal key price rejected. Buy: ${buyPrice}, Sell: ${sellPrice}`,
-    );
+    console.warn(`Abnormal key price rejected. Buy: ${buyPrice}, Sell: ${sellPrice}`);
     return;
   }
 
@@ -27,9 +25,7 @@ async function insertKeyPrice(db, keyobj, buyPrice, sellPrice, timestamp) {
 
 async function cleanupOldKeyPrices(db) {
   try {
-    await db.none(
-      'DELETE FROM key_prices WHERE created_at < NOW() - INTERVAL \'30 days\'',
-    );
+    await db.none('DELETE FROM key_prices WHERE created_at < NOW() - INTERVAL \'30 days\'');
     console.log('Cleaned up key prices older than 30 days.');
   } catch (err) {
     console.error('Error cleaning up old key prices');
@@ -71,9 +67,7 @@ async function adjustPrice({
     Methods.addToPricelist(updatedItem, PRICELIST_PATH);
     socketIO.emit('price', updatedItem);
 
-    console.log(
-      `Price for ${name} updated. Buy: ${newBuyPrice}, Sell: ${newSellPrice}`,
-    );
+    console.log(`Price for ${name} updated. Buy: ${newBuyPrice}, Sell: ${newSellPrice}`);
   } catch (err) {
     console.error('Error adjusting price');
   }
@@ -90,9 +84,8 @@ async function checkKeyPriceStability({
   const CHANGE_THRESHOLD = 0.33;
   const STD_THRESHOLD = 0.66; // You can move this to config if you want
   try {
-    const [
-      { avg_buy: buyA, avg_sell: sellA, std_buy: stdBuyA, std_sell: stdSellA },
-    ] = await db.any(`
+    const [{ avg_buy: buyA, avg_sell: sellA, std_buy: stdBuyA, std_sell: stdSellA }] =
+      await db.any(`
             SELECT
                 AVG(buy_price_metal)::float AS avg_buy,
                 AVG(sell_price_metal)::float AS avg_sell,
@@ -113,9 +106,7 @@ async function checkKeyPriceStability({
         `);
 
     if (buyA == null || sellA == null || buyB == null || sellB == null) {
-      console.log(
-        'Not enough data in one of the 3-hour windows—skipping volatility check.',
-      );
+      console.log('Not enough data in one of the 3-hour windows—skipping volatility check.');
       return;
     }
 
