@@ -1,36 +1,43 @@
-import js from '@eslint/js';
-import prettier from 'eslint-config-prettier';
-import eslintPluginPrettier from 'eslint-plugin-prettier';
+name: Lint and Format Code Base
 
-export default [
-  js.configs.recommended,
-  prettier,
-  {
-    ignores: ['.github/workflows/*'],
-    files: ['**/*.js'],
-    languageOptions: {
-      ecmaVersion: 2021,
-      sourceType: 'module',
-      globals: {
-        window: 'readonly',
-        document: 'readonly',
-        console: 'readonly',
-        module: 'writable',
-        require: 'readonly',
-        process: 'readonly',
-        __dirname: 'readonly',
-      },
-    },
-    plugins: {
-      prettier: eslintPluginPrettier,
-    },
-    rules: {
-      'no-unused-vars': 'warn',
-      'no-console': 'off',
-      eqeqeq: 'error',
-      curly: 'error',
-      // Remove style rules handled by Prettier!
-      'prettier/prettier': 'error',
-    },
-  },
-];
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  run-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Prettier and ESLint
+        run: npm install --no-save prettier eslint eslint-config-prettier eslint-plugin-prettier
+
+      - name: Prettier Auto-Fix
+        run: npx prettier --write .
+
+      - name: ESLint Auto-Fix
+        run: npx eslint . --fix || true
+
+      - name: Unstage workflow files before auto-commit
+        run: git reset HEAD .github/workflows/*
+
+      - name: Commit Auto-Fixes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "style: auto-fix by Prettier/ESLint"
+          commit_user_name: github-actions
+          commit_user_email: github-actions@github.com
+          commit_author: github-actions <github-actions@github.com>
+          file_pattern: ':!**/.github/workflows/*'
