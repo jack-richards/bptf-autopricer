@@ -194,7 +194,7 @@ const calculateAndEmitPrices = async () => {
       // Up to your own discretion whether this is needed or not.
       item_objects.push(item);
     } catch (e) {
-      console.log('Couldn\'t create a price for ' + name);
+      console.log("Couldn't create a price for " + name);
     }
   }
   // Emit all items within extremely quick succession of eachother.
@@ -273,7 +273,7 @@ async function isPriceSwingAcceptable(prev, next, sku) {
   // Fetch last 5 prices from DB
   const history = await db.any(
     'SELECT buy_metal, sell_metal FROM price_history WHERE sku = $1 ORDER BY timestamp DESC LIMIT 5',
-    [sku],
+    [sku]
   );
   if (history.length === 0) {
     return true;
@@ -419,7 +419,7 @@ const filterOutliers = (listingsArray) => {
   const prices = listingsArray.map((listing) => Methods.toMetal(listing.currencies, keyobj.metal));
   const mean = Methods.getRight(prices.reduce((acc, curr) => acc + curr, 0) / prices.length);
   const stdDev = Math.sqrt(
-    prices.reduce((acc, curr) => acc + Math.pow(curr - mean, 2), 0) / prices.length,
+    prices.reduce((acc, curr) => acc + Math.pow(curr - mean, 2), 0) / prices.length
   );
 
   // Filter out listings that are 3 standard deviations away from the mean.
@@ -519,7 +519,7 @@ const getAverages = (name, buyFiltered, sellFiltered, sku, pricetfItem) => {
         pricetfItem,
         final_buyObj,
         final_sellObj,
-        keyobj,
+        keyobj
       );
     } catch (e) {
       // Create an error object with a message detailing this difference.
@@ -574,7 +574,7 @@ const finalisePrice = async (arr, name, sku) => {
   try {
     if (!arr) {
       console.log(
-        `| UPDATING PRICES |:${name} couldn't be updated. CRITICAL, something went wrong in the getAverages logic.`,
+        `| UPDATING PRICES |:${name} couldn't be updated. CRITICAL, something went wrong in the getAverages logic.`
       );
       throw new Error('Something went wrong in the getAverages() logic. DEVELOPER LOOK AT THIS.');
       // Will ensure that neither the buy, nor sell side is completely unpriced. If it is, this means we couldn't get
@@ -660,7 +660,7 @@ const finalisePrice = async (arr, name, sku) => {
       // Save to price history
       await db.none(
         'INSERT INTO price_history (sku, buy_metal, sell_metal, timestamp) VALUES ($1, $2, $3, NOW())',
-        [sku, Methods.toMetal(item.buy, keyobj.metal), Methods.toMetal(item.sell, keyobj.metal)],
+        [sku, Methods.toMetal(item.buy, keyobj.metal), Methods.toMetal(item.sell, keyobj.metal)]
       );
 
       // Return the new item object with the latest price.

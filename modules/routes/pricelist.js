@@ -14,7 +14,7 @@ module.exports = function (app, config) {
     __dirname,
     config.tf2AutobotDir,
     config.botTradingDir,
-    'pricelist.json',
+    'pricelist.json'
   );
   const itemListPath = path.resolve(__dirname, '../../files/item_list.json');
 
@@ -41,11 +41,11 @@ module.exports = function (app, config) {
 		<input type="number" id="min-${sku}" value="${defaultMin}" style="width: 40px;">
 		<input type="number" id="max-${sku}" value="${defaultMax}" style="width: 40px;">
 		${
-  inBot
-    ? `<button onclick="queueAction('remove','${sku}')">❌</button>
+      inBot
+        ? `<button onclick="queueAction('remove','${sku}')">❌</button>
 				<button onclick="queueEdit('${sku}')">✏️</button>`
-    : `<button onclick="queueAction('add','${sku}')">✅</button>`
-}
+        : `<button onclick="queueAction('add','${sku}')">✅</button>`
+    }
 		`;
 
       const rowClass = showAge

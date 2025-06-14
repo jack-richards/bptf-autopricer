@@ -9,7 +9,7 @@ module.exports = function (app, config) {
     __dirname,
     config.tf2AutobotDir,
     config.botTradingDir,
-    'pricelist.json',
+    'pricelist.json'
   );
   const itemListPath = path.resolve(__dirname, '../../files/item_list.json');
 

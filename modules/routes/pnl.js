@@ -11,7 +11,7 @@ module.exports = function (app, config) {
     __dirname,
     config.tf2AutobotDir,
     config.botTradingDir,
-    'polldata.json',
+    'polldata.json'
   );
   const pricelistPath = path.resolve(__dirname, '../../files/pricelist.json');
   const keyPrice = loadJson(pricelistPath).items.find((i) => i.sku === '5021;6')?.sell?.metal;
@@ -95,7 +95,7 @@ module.exports = function (app, config) {
     const breakdownTable = sortedByProfit
       .map(
         ([sku, data]) =>
-          `<tr><td>${sku}</td><td>${data.qty}</td><td>${data.profit.toFixed(2)} Ref</td></tr>`,
+          `<tr><td>${sku}</td><td>${data.qty}</td><td>${data.profit.toFixed(2)} Ref</td></tr>`
       )
       .join('');
 

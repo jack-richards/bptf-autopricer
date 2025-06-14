@@ -45,7 +45,7 @@ async function updateMovingAverages(db, pgp, alpha = 0.35) {
         Math.abs((orig.moving_avg_buy_count ?? orig.current_buy_count) - u.moving_avg_buy_count) >
           1e-6 ||
         Math.abs(
-          (orig.moving_avg_sell_count ?? orig.current_sell_count) - u.moving_avg_sell_count,
+          (orig.moving_avg_sell_count ?? orig.current_sell_count) - u.moving_avg_sell_count
         ) > 1e-6
       );
     });
@@ -57,7 +57,7 @@ async function updateMovingAverages(db, pgp, alpha = 0.35) {
 
   const cs = new pgp.helpers.ColumnSet(
     ['sku', 'moving_avg_count', 'moving_avg_buy_count', 'moving_avg_sell_count'],
-    { table: 'tmp' },
+    { table: 'tmp' }
   );
   const values = pgp.helpers.values(updates, cs);
 
@@ -76,7 +76,7 @@ async function updateMovingAverages(db, pgp, alpha = 0.35) {
     const updatedSkus = updates.map((u) => u.sku);
     const updatedRows = await db.any(
       'SELECT sku, moving_avg_count, moving_avg_buy_count, moving_avg_sell_count FROM listing_stats WHERE sku IN ($1:csv) ORDER BY sku',
-      [updatedSkus],
+      [updatedSkus]
     );
     console.log('Updated moving averages:', updatedRows);
   } catch (err) {
@@ -91,7 +91,7 @@ async function updateListingStats(db, sku) {
             COUNT(*) FILTER (WHERE intent = 'buy') AS buy,
             COUNT(*) FILTER (WHERE intent = 'sell') AS sell
          FROM listings WHERE sku = $1`,
-    [sku],
+    [sku]
   );
   await db.none(
     `
@@ -103,7 +103,7 @@ async function updateListingStats(db, sku) {
             current_sell_count = $4,
             last_updated = NOW()
     `,
-    [sku, overall, buy, sell],
+    [sku, overall, buy, sell]
   );
 }
 

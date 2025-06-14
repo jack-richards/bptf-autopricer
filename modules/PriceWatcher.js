@@ -26,12 +26,12 @@ function checkOldPrices(pricelistPath, ageThresholdSec = 2 * 3600) {
 
     if (oldItems.length > 0) {
       console.log(
-        `Found ${oldItems.length} out of ${totalItems.length} items older than ${ageThresholdSec / 3600} hours:`,
+        `Found ${oldItems.length} out of ${totalItems.length} items older than ${ageThresholdSec / 3600} hours:`
       );
       oldItems.forEach((item) => {
         const ageHr = ((now - item.time) / 3600).toFixed(2);
         console.log(
-          ` - ${item.name} (SKU: ${item.sku}) is ${ageHr} hours old (timestamp: ${item.time})`,
+          ` - ${item.name} (SKU: ${item.sku}) is ${ageHr} hours old (timestamp: ${item.time})`
         );
       });
     } else {

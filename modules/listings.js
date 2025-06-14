@@ -9,7 +9,7 @@ const insertListing = async (
   sku,
   currencies,
   intent,
-  steamid,
+  steamid
 ) => {
   let timestamp = Math.floor(Date.now() / 1000);
   const result = await db.none(
@@ -17,7 +17,7 @@ const insertListing = async (
          VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (name, sku, intent, steamid)
          DO UPDATE SET currencies = $3, updated = $5;`,
-    [response_item.name, sku, JSON.stringify(currencies), intent, timestamp, steamid],
+    [response_item.name, sku, JSON.stringify(currencies), intent, timestamp, steamid]
   );
   await updateListingStats(db, sku);
   return result;
@@ -27,12 +27,12 @@ const deleteRemovedListing = async (db, updateListingStats, steamid, name, inten
   const sku = (
     await db.oneOrNone(
       'SELECT sku FROM listings WHERE steamid = $1 AND name = $2 AND intent = $3 LIMIT 1',
-      [steamid, name, intent],
+      [steamid, name, intent]
     )
   )?.sku;
   const result = await db.any(
     'DELETE FROM listings WHERE steamid = $1 AND name = $2 AND intent = $3;',
-    [steamid, name, intent],
+    [steamid, name, intent]
   );
   if (sku) {
     await updateListingStats(db, sku);
@@ -44,7 +44,7 @@ const HARD_MAX_AGE_SECONDS = 5 * 24 * 60 * 60; // 5 days
 
 const deleteOldListings = async (db) => {
   const stats = await db.any(
-    'SELECT sku, moving_avg_buy_count, moving_avg_sell_count FROM listing_stats',
+    'SELECT sku, moving_avg_buy_count, moving_avg_sell_count FROM listing_stats'
   );
   const buyBands = {
     veryActive: [],
@@ -122,8 +122,8 @@ const deleteOldListings = async (db) => {
         break;
     }
     await db.none(
-      'DELETE FROM listings WHERE sku IN ($1:csv) AND intent = \'buy\' AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2',
-      [skus, age],
+      "DELETE FROM listings WHERE sku IN ($1:csv) AND intent = 'buy' AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2",
+      [skus, age]
     );
   }
 
@@ -154,15 +154,15 @@ const deleteOldListings = async (db) => {
         break;
     }
     await db.none(
-      'DELETE FROM listings WHERE sku IN ($1:csv) AND intent = \'sell\' AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2',
-      [skus, age],
+      "DELETE FROM listings WHERE sku IN ($1:csv) AND intent = 'sell' AND EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $2",
+      [skus, age]
     );
   }
 
   // Failsafe: delete any listing older than the hard max age
   await db.none(
     'DELETE FROM listings WHERE EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $1',
-    [HARD_MAX_AGE_SECONDS],
+    [HARD_MAX_AGE_SECONDS]
   );
 };
 

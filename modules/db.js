@@ -14,7 +14,7 @@ function createDb(config) {
     ['name', 'sku', 'currencies', 'intent', 'updated', 'steamid'],
     {
       table: 'listings',
-    },
+    }
   );
   return { db, pgp, cs };
 }

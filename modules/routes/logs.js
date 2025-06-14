@@ -18,7 +18,7 @@ module.exports = (app, config) => {
 
     fs.readFile(logPath, 'utf8', (err, data) => {
       const buttons = LOG_FILES.map(
-        (f) => `<a href="/logs?file=${f}"><button>${f}</button></a>`,
+        (f) => `<a href="/logs?file=${f}"><button>${f}</button></a>`
       ).join(' ');
 
       if (err) {

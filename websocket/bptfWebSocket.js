@@ -74,21 +74,21 @@ function initBptfWebSocket({
               listingDetails &&
               !excludedListingDescriptions.some((detail) =>
                 new RegExp(`\\b${detail}\\b`, 'i').test(
-                  listingDetails.normalize('NFKD').toLowerCase().trim(),
-                ),
+                  listingDetails.normalize('NFKD').toLowerCase().trim()
+                )
               )
             ) {
               try {
                 var sku = schemaManager.schema.getSkuFromName(response_item.name);
                 if (sku === null || sku === undefined) {
                   throw new Error(
-                    `| UPDATING PRICES |: Couldn't price ${response_item.name}. Issue with retrieving this items defindex.`,
+                    `| UPDATING PRICES |: Couldn't price ${response_item.name}. Issue with retrieving this items defindex.`
                   );
                 }
                 insertListing(response_item, sku, currencies, intent, steamid);
               } catch (e) {
                 console.log(e);
-                console.log('Couldn\'t create a price for ' + response_item.name);
+                console.log("Couldn't create a price for " + response_item.name);
               }
             }
           }
@@ -137,7 +137,7 @@ function initBptfWebSocket({
         }
       });
       console.log(
-        `[WebSocket] Received batch: ${json.length} events (${updateCount} updates, ${deleteCount} deletions)`,
+        `[WebSocket] Received batch: ${json.length} events (${updateCount} updates, ${deleteCount} deletions)`
       );
       json.forEach(handleEvent);
     } else {

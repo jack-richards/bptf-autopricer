@@ -16,7 +16,7 @@ async function insertKeyPrice(db, keyobj, buyPrice, sellPrice, timestamp) {
     await db.none(
       `INSERT INTO key_prices (sku, buy_price_metal, sell_price_metal, timestamp) 
             VALUES ($1, $2, $3, $4)`,
-      ['5021;6', buyPrice, sellPrice, timestamp],
+      ['5021;6', buyPrice, sellPrice, timestamp]
     );
   } catch (err) {
     console.error('Error inserting key price');
@@ -25,7 +25,7 @@ async function insertKeyPrice(db, keyobj, buyPrice, sellPrice, timestamp) {
 
 async function cleanupOldKeyPrices(db) {
   try {
-    await db.none('DELETE FROM key_prices WHERE created_at < NOW() - INTERVAL \'30 days\'');
+    await db.none("DELETE FROM key_prices WHERE created_at < NOW() - INTERVAL '30 days'");
     console.log('Cleaned up key prices older than 30 days.');
   } catch (err) {
     console.error('Error cleaning up old key prices');
@@ -113,7 +113,7 @@ async function checkKeyPriceStability({
     // Additional stddev check
     if (stdSellA > STD_THRESHOLD || stdBuyA > STD_THRESHOLD) {
       sendPriceAlert(
-        `High key price volatility detected (std sell: ${stdSellA}, std buy: ${stdBuyA})`,
+        `High key price volatility detected (std sell: ${stdSellA}, std buy: ${stdBuyA})`
       );
       return;
     }
@@ -145,7 +145,7 @@ async function checkKeyPriceStability({
         socketIO,
       });
       return sendPriceAlert(
-        `3h sell avg moved by ${sellDelta.toFixed(2)} → adjusting to ${roundedSell}`,
+        `3h sell avg moved by ${sellDelta.toFixed(2)} → adjusting to ${roundedSell}`
       );
     }
 
@@ -169,7 +169,7 @@ async function checkKeyPriceStability({
         socketIO,
       });
       return sendPriceAlert(
-        `3h buy avg moved by ${buyDelta.toFixed(2)} → adjusting to ${roundedBuy}`,
+        `3h buy avg moved by ${buyDelta.toFixed(2)} → adjusting to ${roundedBuy}`
       );
     }
 
@@ -191,7 +191,7 @@ async function checkKeyPriceStability({
       });
       return sendPriceAlert(
         `Spread too tight (${(roundedSell - Methods.getRight(rawBuy + MIN_STEP)).toFixed(2)}); ` +
-          `forcing buy to ${roundedBuy} so buy + ${MIN_STEP.toFixed(2)} ≤ sell (${roundedSell}).`,
+          `forcing buy to ${roundedBuy} so buy + ${MIN_STEP.toFixed(2)} ≤ sell (${roundedSell}).`
       );
     }
 
@@ -208,7 +208,7 @@ async function checkKeyPriceStability({
       socketIO,
     });
     console.log(
-      `Stable over last 6h (windows avg buy=${roundedBuy}, sell=${roundedSell}). Change delta for buy=${buyDelta} and change delta for sell=${sellDelta}`,
+      `Stable over last 6h (windows avg buy=${roundedBuy}, sell=${roundedSell}). Change delta for buy=${buyDelta} and change delta for sell=${sellDelta}`
     );
   } catch (err) {
     console.error('Error checking key price stability:', err);

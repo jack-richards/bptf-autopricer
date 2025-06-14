@@ -9,7 +9,7 @@ const io = socketIO(server);
 app.use(
   express.urlencoded({
     extended: true,
-  }),
+  })
 );
 
 const config = require('../config.json');

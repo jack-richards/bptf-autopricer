@@ -86,7 +86,7 @@ Methods.prototype.calculatePricingAPIDifferences = function (
   pricetfItem,
   final_buyObj,
   final_sellObj,
-  keyobj,
+  keyobj
 ) {
   var percentageDifferences = {};
 
@@ -112,11 +112,11 @@ Methods.prototype.calculatePricingAPIDifferences = function (
 
   percentageDifferences.buyDifference = this.calculatePercentageDifference(
     results.priceTFBuyPrice,
-    results.autopricerBuyPrice,
+    results.autopricerBuyPrice
   );
   percentageDifferences.sellDifference = this.calculatePercentageDifference(
     results.priceTFSellPrice,
-    results.autopricerSellPrice,
+    results.autopricerSellPrice
   );
 
   // Ensures that data we're going to use in comparison are numbers. If not we throw an error.
@@ -317,7 +317,7 @@ Methods.prototype.getKeyPriceFromPricesTF = async function () {
     }
 
     throw new Error(
-      'Failed to get key price from Prices.TF. It is either down or we are being rate-limited.',
+      'Failed to get key price from Prices.TF. It is either down or we are being rate-limited.'
     );
   } catch (error) {
     throw error;
@@ -342,7 +342,7 @@ Methods.prototype.getKeyFromExternalAPI = async function () {
         let buyKeys = Object.is(response.data.buyKeys, undefined) ? 0 : response.data.buyKeys;
 
         let buyMetal = this.halfScrapToRefined(
-          Object.is(response.data.buyHalfScrap, undefined) ? 0 : response.data.buyHalfScrap,
+          Object.is(response.data.buyHalfScrap, undefined) ? 0 : response.data.buyHalfScrap
         );
 
         buyMetal = this.getRight(buyMetal);
@@ -355,7 +355,7 @@ Methods.prototype.getKeyFromExternalAPI = async function () {
         let sellKeys = Object.is(response.data.sellKeys, undefined) ? 0 : response.data.sellKeys;
 
         let sellMetal = this.halfScrapToRefined(
-          Object.is(response.data.sellHalfScrap, undefined) ? 0 : response.data.sellHalfScrap,
+          Object.is(response.data.sellHalfScrap, undefined) ? 0 : response.data.sellHalfScrap
         );
 
         sellMetal = this.getRight(sellMetal);
@@ -376,7 +376,7 @@ Methods.prototype.getKeyFromExternalAPI = async function () {
     }
 
     throw new Error(
-      'Failed to get key price from Prices.TF. It is either down or we are being rate-limited.',
+      'Failed to get key price from Prices.TF. It is either down or we are being rate-limited.'
     );
   } catch (error) {
     throw error;
@@ -404,7 +404,7 @@ Methods.prototype.getExternalPricelist = async function () {
       return data;
     } catch (cacheErr) {
       throw new Error(
-        `Failed to fetch external pricelist and no valid cache available: ${cacheErr.message}`,
+        `Failed to fetch external pricelist and no valid cache available: ${cacheErr.message}`
       );
     }
   }

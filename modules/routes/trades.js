@@ -12,7 +12,7 @@ module.exports = function (app, config) {
       __dirname,
       config.tf2AutobotDir,
       config.botTradingDir,
-      'polldata.json',
+      'polldata.json'
     );
     const pricelistPath = path.resolve(__dirname, '../../files/pricelist.json');
     const pricelist = loadJson(pricelistPath);
@@ -107,13 +107,13 @@ module.exports = function (app, config) {
         <td><a href="${t.profileUrl}" target="_blank">${t.id}</a><br><small>${t.name}</small></td>
         <td>${t.time}</td>
         <td><strong>Sent:</strong><br>${Object.entries(t.itemsOur)
-    .map(([sku, qty]) => `${qty}× ${skuToName[sku] || 'Unknown'} (${sku})`)
-    .join('<br>')}<br>
+          .map(([sku, qty]) => `${qty}× ${skuToName[sku] || 'Unknown'} (${sku})`)
+          .join('<br>')}<br>
           <strong>Value:</strong> ${t.valueOur.keys} Keys, ${t.valueOur.metal} Ref
         </td>
         <td><strong>Received:</strong><br>${Object.entries(t.itemsTheir)
-    .map(([sku, qty]) => `${qty}× ${skuToName[sku] || 'Unknown'} (${sku})`)
-    .join('<br>')}<br>
+          .map(([sku, qty]) => `${qty}× ${skuToName[sku] || 'Unknown'} (${sku})`)
+          .join('<br>')}<br>
           <strong>Value:</strong> ${t.valueTheir.keys} Keys, ${t.valueTheir.metal} Ref
         </td>
         <td>${t.action}<br><small>${t.reason}</small></td>
@@ -122,7 +122,7 @@ module.exports = function (app, config) {
           ${t.accepted ? `${t.profit > 0 ? '+' : ''}${t.profit.toFixed(2)} Ref` : '-'}
         </td>
       </tr>
-    `,
+    `
       )
       .join('');
 
