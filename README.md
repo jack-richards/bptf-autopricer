@@ -1,46 +1,44 @@
 # bliss-autopricer
+
 <div align="center"><img src="https://github.com/jack-richards/bptf-autopricer/assets/58331725/203fe808-30ff-4d7d-868c-a3ef6d31497d" alt="logo" style="width: 280px; height: 320px; display: block; margin-left: auto; margin-right: auto;"></div>
 
 A custom pricer that generates item prices by analysing live and snapshot data from [backpack.tf](https://backpack.tf), applies sanity checks, and integrates seamlessly with TF2 Autobot. Modified and forked from Jacks Auto Pricer!
 
-Features
---------
+## Features
 
--   **Automated Pricing:** Automatically generates item prices using both real-time and snapshot [backpack.tf](https://backpack.tf/) listing data, ensuring a profit margin and performing various sanity checks.
+- **Automated Pricing:** Automatically generates item prices using both real-time and snapshot [backpack.tf](https://backpack.tf/) listing data, ensuring a profit margin and performing various sanity checks.
 
--   **Baseline Comparison:** Compares generated prices against those from [Prices.tf](https://github.com/prices-tf) - disregarding prices that go over percentage thresholds configured.
+- **Baseline Comparison:** Compares generated prices against those from [Prices.tf](https://github.com/prices-tf) - disregarding prices that go over percentage thresholds configured.
 
--   **Trusted/Blacklisted Steam IDs:** Prioritises listings from trusted bots, and filters out untrusted bots when calculating prices. Fully configurable.
+- **Trusted/Blacklisted Steam IDs:** Prioritises listings from trusted bots, and filters out untrusted bots when calculating prices. Fully configurable.
 
--   **Excluded Listing Descriptions:** Filters out listings with descriptions containing configured keywords. Useful for removing listings from calculations that include special attributes, such as spells.
+- **Excluded Listing Descriptions:** Filters out listings with descriptions containing configured keywords. Useful for removing listings from calculations that include special attributes, such as spells.
 
--   **Filters Outliers:** With a sufficient number of listings, filters out outliers from the mean. Removes listings with prices that deviate too much from the average.
+- **Filters Outliers:** With a sufficient number of listings, filters out outliers from the mean. Removes listings with prices that deviate too much from the average.
 
--   **API Functionality:**
+- **API Functionality:**
 
-    -   *Add and Delete Items:* The API can be used to add or remove items for the auto pricer to track.
+  - *Add and Delete Items:* The API can be used to add or remove items for the auto pricer to track.
 
-    -   *Retrieve Prices:* Prices can be requested and retrieved through the API.
+  - *Retrieve Prices:* Prices can be requested and retrieved through the API.
 
--   **Socket.IO Server:**
+- **Socket.IO Server:**
 
-    -   Emits item prices to any listeners using a Socket.IO server.
+  - Emits item prices to any listeners using a Socket.IO server.
 
-    -   Prices are stored and emitted in a format fully supported by the [TF2 Auto Bot](https://github.com/TF2Autobot/tf2autobot) custom-pricer interface.
+  - Prices are stored and emitted in a format fully supported by the [TF2 Auto Bot](https://github.com/TF2Autobot/tf2autobot) custom-pricer interface.
 
--   **Price Watcher Web Interface:** Provides a dashboard to monitor item data freshness, view outdated entries, and manage your bot's selling pricelist via add/remove actions.
+- **Price Watcher Web Interface:** Provides a dashboard to monitor item data freshness, view outdated entries, and manage your bot's selling pricelist via add/remove actions.
 
-Requirements
-------------
+## Requirements
 
--   **Node.js & npm**
+- **Node.js & npm**
 
--   **PostgreSQL**
+- **PostgreSQL**
 
--   **TF2 Auto Bot**
+- **TF2 Auto Bot**
 
-Setup & Installation
---------------------
+## Setup & Installation
 
 1.  Clone this repository and install dependencies:
 
@@ -104,8 +102,7 @@ ALTER TABLE schemaname.listing_stats
 
 Alternatively, run the provided `update-listing-stats.sql` file.
 
-Configuration
--------------
+## Configuration
 
 ### `config.json`
 
@@ -164,8 +161,7 @@ Controls the Price Watcher web UI and integration with TF2AutoBot's selling pric
 }
 ```
 
-API Routes & Socket IO
-----------------------
+## API Routes & Socket IO
 
 The socket io server will emit events called 'price' with an item object as the value. The item objects are structured like the following:
 
@@ -186,9 +182,9 @@ The socket io server will emit events called 'price' with an item object as the 
 }
 ```
 
--   Note that the same JSON structure is used when an item or an array of items is returned by the API.
+- Note that the same JSON structure is used when an item or an array of items is returned by the API.
 
--   This JSON format is fully compatible with what [TF2 Auto Bot](https://github.com/TF2Autobot/tf2autobot) requires for a custom pricer implementation.
+- This JSON format is fully compatible with what [TF2 Auto Bot](https://github.com/TF2Autobot/tf2autobot) requires for a custom pricer implementation.
 
 Now I'll highlight the different API routes you can make queries to, and what responses you can expect to receive.\
 Please note that both the Socket IO server and API run locally (localhost) on the port defined in `config.json`.
@@ -201,23 +197,23 @@ Retrieves a particular item object from the pricelist using the Stock Keeping Un
 
 **Request:**
 
--   **Parameters:**
+- **Parameters:**
 
-    -   `sku` (String): The Stock Keeping Unit of the item. E.g., Mann Co. Supply Crate Key has an SKU of 5021;6.
+  - `sku` (String): The Stock Keeping Unit of the item. E.g., Mann Co. Supply Crate Key has an SKU of 5021;6.
 
 **Response:**
 
--   **Success (200):**
+- **Success (200):**
 
-    -   JSON item object containing information about the item, including the prices.
+  - JSON item object containing information about the item, including the prices.
 
--   **Failure (404):**
+- **Failure (404):**
 
-    -   If the requested item is not found in the pricelist.
+  - If the requested item is not found in the pricelist.
 
--   **Failure (400):**
+- **Failure (400):**
 
-    -   Where 5021;6 is the SKU provided and there is an issue with fetching the key price from Prices.tf.
+  - Where 5021;6 is the SKU provided and there is an issue with fetching the key price from Prices.tf.
 
 ```
 GET /items/
@@ -227,13 +223,13 @@ Retrieves the entire pricelist.
 
 **Response:**
 
--   **Success (200):**
+- **Success (200):**
 
-    -   JSON object containing the entire pricelist. An array of JSON item objects.
+  - JSON object containing the entire pricelist. An array of JSON item objects.
 
--   **Failure (400):**
+- **Failure (400):**
 
-    -   If there is an issue loading the pricelist.
+  - If there is an issue loading the pricelist.
 
 ```
 POST /items/:sku
@@ -243,15 +239,15 @@ An endpoint that returns a status code of 200 for each request. Exists so there'
 
 **Request:**
 
--   **Parameters:**
+- **Parameters:**
 
-    -   `sku` (String): The Stock Keeping Unit of the item.
+  - `sku` (String): The Stock Keeping Unit of the item.
 
 **Response:**
 
--   **Success (200):**
+- **Success (200):**
 
-    -   JSON object indicating the SKU.
+  - JSON object indicating the SKU.
 
 ```
 POST /items/add/:name
@@ -261,19 +257,19 @@ Adds the item to the list of items to auto price.
 
 **Request:**
 
--   **Parameters:**
+- **Parameters:**
 
-    -   `name` (String): The name of the item to add.
+  - `name` (String): The name of the item to add.
 
 **Response:**
 
--   **Success (200):**
+- **Success (200):**
 
-    -   Item successfully added. Will now be automatically priced.
+  - Item successfully added. Will now be automatically priced.
 
--   **Failure (400):**
+- **Failure (400):**
 
-    -   If the item already exists in the item list.
+  - If the item already exists in the item list.
 
 ```
 POST /items/delete/:name
@@ -283,22 +279,21 @@ Deletes an item from the list of items to automatically price.
 
 **Request:**
 
--   **Parameters:**
+- **Parameters:**
 
-    -   `name` (String): The name of the item to delete.
+  - `name` (String): The name of the item to delete.
 
 **Response:**
 
--   **Success (200):**
+- **Success (200):**
 
-    -   Item successfully deleted.
+  - Item successfully deleted.
 
--   **Failure (400):**
+- **Failure (400):**
 
-    -   If the item does not exist in the item list.
+  - If the item does not exist in the item list.
 
-Running
--------
+## Running
 
 Start the pricer (includes API, Socket.IO & Web Interface):
 
@@ -313,25 +308,27 @@ npm install -g pm2
 pm2 start bptf-autopricer.js --name bptf-autopricer
 ```
 
-Web Interface
--------------
+## Web Interface
 
 The bliss-autopricer includes a built-in web dashboard for managing and monitoring your pricing bot. This interface is available at `http://localhost:<pricerConfig.port>` (default: 3000).
 
 ### Main Features
 
 - **Dashboard Overview**
+
   - View and filter items by status: **Outdated**, **Current**, and **Unpriced**.
   - Outdated items are color-coded by how long their price has not been updated (e.g., ≥2h, ≥24h, ≥72h).
   - Search and filter items by name or pricelist status.
 
 - **Pricelist Management**
+
   - Add new items to be auto-priced by entering their name.
   - Remove items from the auto-pricer.
   - Edit min/max buy/sell bounds for each item directly in the table.
   - All add/remove/edit actions are queued for review before being applied.
 
 - **Queue System**
+
   - Pending actions (add, remove, edit) are shown in a queue panel.
   - Click "Apply & Restart" to apply all queued changes and automatically restart your TF2Autobot process via PM2.
 
@@ -362,29 +359,28 @@ The bliss-autopricer includes a built-in web dashboard for managing and monitori
 
 ---
 
-FAQ
+## FAQ
+
+- Q: How do I connect this to TF2AutoBot?
+
+  A: See: [jack-richards#11](https://github.com/jack-richards/bptf-autopricer/issues/11)
+
+- Q: I am getting a 429 error in the console what does this mean?
+
+  A: See: [jack-richards#17](https://github.com/jack-richards/bptf-autopricer/issues/17)
+
+- Q: I am being shown 'error: relation "listings" does not exist' when running the pricer.
+
+  A: See: [jack-richards#14](https://github.com/jack-richards/bptf-autopricer/issues/14)
+
+- Q: Why is the pricer giving a 'Not valid JSON error'?
+
+  A: Your JSON isn't valid - you likely have a `item_list.json` file that does not follow the expected format. Refer to [this example](https://github.com/jack-richards/bptf-autopricer/blob/main/files/item_list.json) of what a valid `item_list.json` file should look like.
+
+- Q: There are loads of 'Couldn't price item' errors, is everything broken?!
+
+  A: Nope! Everything is fine :D it's typically just the pricer protecting you by discarding prices that deviate too much from the prices.tf baseline (which is configurable). In time, you should get a set of baseline prices for nearly all of your items which will be updated as regularly as possible thereafter.
+
 ---
 
--   Q: How do I connect this to TF2AutoBot?
-
-    A: See: [jack-richards#11](https://github.com/jack-richards/bptf-autopricer/issues/11)
-
--   Q: I am getting a 429 error in the console what does this mean?
-
-    A: See: [jack-richards#17](https://github.com/jack-richards/bptf-autopricer/issues/17)
-
--   Q: I am being shown 'error: relation "listings" does not exist' when running the pricer.
-
-    A: See: [jack-richards#14](https://github.com/jack-richards/bptf-autopricer/issues/14)
-
--   Q: Why is the pricer giving a 'Not valid JSON error'?
-
-    A: Your JSON isn't valid - you likely have a `item_list.json` file that does not follow the expected format. Refer to [this example](https://github.com/jack-richards/bptf-autopricer/blob/main/files/item_list.json) of what a valid `item_list.json` file should look like.
-
--   Q: There are loads of 'Couldn't price item' errors, is everything broken?!
-
-    A: Nope! Everything is fine :D it's typically just the pricer protecting you by discarding prices that deviate too much from the prices.tf baseline (which is configurable). In time, you should get a set of baseline prices for nearly all of your items which will be updated as regularly as possible thereafter.
-
-* * * * *
-
-*Built with ❤️ for TF2 trading*
+_Built with ❤️ for TF2 trading_
