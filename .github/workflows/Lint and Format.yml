@@ -31,6 +31,9 @@ jobs:
       - name: ESLint Auto-Fix
         run: npx eslint . --fix || true
 
+      - name: Unstage workflow files before auto-commit
+        run: git reset HEAD .github/workflows/*
+
       - name: Commit Auto-Fixes
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
