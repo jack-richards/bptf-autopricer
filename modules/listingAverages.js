@@ -107,7 +107,7 @@ async function updateListingStats(db, sku) {
     `,
     [sku, overall, buy, sell]
   );
-  console.log(`Updated stats for SKU ${sku}: overall=${overall}, buy=${buy}, sell=${sell}`);
+  //console.log(`Updated stats for SKU ${sku}: overall=${overall}, buy=${buy}, sell=${sell}`);
 }
 
 async function initializeListingStats(db) {

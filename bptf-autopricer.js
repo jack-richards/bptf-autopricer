@@ -185,7 +185,7 @@ const calculateAndEmitPrices = async () => {
       priceHistoryEntries.push(result.priceHistory);
       emitQueue.enqueue(item);
     } catch (e) {
-      console.log("Couldn't create a price for " + name);
+      console.log("Couldn't create a price for " + name + ' due to: ' + e.message);
     }
   })));
 
@@ -239,8 +239,8 @@ schemaManager.init(async function (err) {
   await calculateAndEmitPrices();
   console.log('Prices calculated and emitted on startup.');
   // Call this once at startup if needed
-  await initializeListingStats(db);
-  console.log('Listing stats initialized.');
+  //await initializeListingStats(db);
+  //console.log('Listing stats initialized.');
   //InitialKeyPricingContinued
   await checkKeyPriceStability({
     db,
@@ -656,6 +656,15 @@ const finalisePrice = async (arr, name, sku) => {
       arr[0] = Methods.parsePrice(arr[0], keyobj.metal);
       arr[1] = Methods.parsePrice(arr[1], keyobj.metal);
 
+      // Clamp prices to bounds if set
+      const bounds = getItemBounds().get(name) || {};
+      // Clamp the buy and sell prices to the bounds set in the config.
+      // If the bounds are not set, it will just use the default values of 0 and Infinity.
+      arr[0].keys = clamp(arr[0].keys, bounds.minBuyKeys, bounds.maxBuyKeys);
+      arr[0].metal = clamp(arr[0].metal, bounds.minBuyMetal, bounds.maxBuyMetal);
+      arr[1].keys = clamp(arr[1].keys, bounds.minSellKeys, bounds.maxSellKeys);
+      arr[1].metal = clamp(arr[1].metal, bounds.minSellMetal, bounds.maxSellMetal);
+
       // Enforce minSellMargin from config
       const minSellMargin = config.minSellMargin ?? 0.11;
       var buyInMetal = Methods.toMetal(arr[0], keyobj.metal);
@@ -680,15 +689,6 @@ const finalisePrice = async (arr, name, sku) => {
           metal: Methods.getRight(arr[1].metal),
         };
       }
-
-      // Clamp prices to bounds if set
-      const bounds = getItemBounds().get(name) || {};
-      // Clamp the buy and sell prices to the bounds set in the config.
-      // If the bounds are not set, it will just use the default values of 0 and Infinity.
-      arr[0].keys = clamp(arr[0].keys, bounds.minBuyKeys, bounds.maxBuyKeys);
-      arr[0].metal = clamp(arr[0].metal, bounds.minBuyMetal, bounds.maxBuyMetal);
-      arr[1].keys = clamp(arr[1].keys, bounds.minSellKeys, bounds.maxSellKeys);
-      arr[1].metal = clamp(arr[1].metal, bounds.minSellMetal, bounds.maxSellMetal);
 
       // Load previous price from pricelist if available
       const pricelist = JSON.parse(fs.readFileSync(PRICELIST_PATH, 'utf8'));

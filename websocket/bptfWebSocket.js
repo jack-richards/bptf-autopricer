@@ -23,7 +23,7 @@ function initBptfWebSocket({
   excludedSteamIds,
   excludedListingDescriptions,
   blockedAttributes,
-  logFile,
+  logFile
 }) {
   const rws = new ReconnectingWebSocket('wss://ws.backpack.tf/events/', undefined, {
     WebSocket: ws,
