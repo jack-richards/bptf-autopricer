@@ -398,7 +398,7 @@ const determinePrice = async (name, sku) => {
 
   try {
     // If the buyFiltered or sellFiltered arrays are empty, we throw an error.
-    let arr = getAverages(name, buyFiltered, sellFiltered, sku, pricetfItem);
+    let arr = await getAverages(name, buyFiltered, sellFiltered, sku, pricetfItem);
     return arr;
   } catch (e) {
     throw new Error(e);
@@ -450,7 +450,26 @@ const filterOutliers = (listingsArray) => {
   return filteredMean;
 };
 
-const getAverages = (name, buyFiltered, sellFiltered, sku, pricetfItem) => {
+async function isSellPriceOutlier(sku, candidateSellMetal, threshold = 3) {
+  // Fetch last 10 sell prices from history
+  const history = await db.any(
+    'SELECT sell_metal FROM price_history WHERE sku = $1 ORDER BY timestamp DESC LIMIT 10',
+    [sku]
+  );
+  if (history.length < 3) return false; // Not enough data to judge
+
+  const prices = history.map(p => Number(p.sell_metal));
+  const mean = prices.reduce((a, b) => a + b, 0) / prices.length;
+  const stdDev = Math.sqrt(prices.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / prices.length);
+
+  // If stdDev is 0 (all prices the same), only allow exact match
+  if (stdDev === 0) return candidateSellMetal !== mean;
+
+  const zScore = (candidateSellMetal - mean) / stdDev;
+  return Math.abs(zScore) > threshold;
+}
+
+const getAverages = async (name, buyFiltered, sellFiltered, sku, pricetfItem) => {
   // Initialse two objects to contain the items final buy and sell prices.
   var final_buyObj = {
     keys: 0,
@@ -501,14 +520,27 @@ const getAverages = (name, buyFiltered, sellFiltered, sku, pricetfItem) => {
     // However, I decided to prioritise 'trusted' listings by certain steamids. This may result in a very high sell price, instead
     // of a competitive one.
     if (sellFiltered.length > 0) {
-      final_sellObj.keys = Object.is(sellFiltered[0].currencies.keys, undefined)
+      // Try trusted listings first, but skip if they're outliers
+      let picked = null;
+      for (let i = 0; i < sellFiltered.length; i++) {
+        const candidate = sellFiltered[i];
+        const candidateMetal = Methods.toMetal(candidate.currencies, keyobj.metal);
+        // Await the outlier check
+        if (!(await isSellPriceOutlier(sku, candidateMetal))) {
+          picked = candidate;
+          break;
+        }
+      }
+      // If all are outliers, fallback to the lowest price anyway (to avoid not pricing at all)
+      if (!picked) picked = sellFiltered[0];
+      final_sellObj.keys = Object.is(picked.currencies.keys, undefined)
         ? 0
-        : sellFiltered[0].currencies.keys;
-      final_sellObj.metal = Object.is(sellFiltered[0].currencies.metal, undefined)
+        : picked.currencies.keys;
+      final_sellObj.metal = Object.is(picked.currencies.metal, undefined)
         ? 0
-        : sellFiltered[0].currencies.metal;
+        : picked.currencies.metal;
     } else {
-      throw new Error(`| UPDATING PRICES |: ${name} not enough sell listings...`); // Not enough
+      throw new Error(`| UPDATING PRICES |: ${name} not enough sell listings...`);
     }
 
     var usePrices = false;
