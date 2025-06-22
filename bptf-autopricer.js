@@ -17,7 +17,7 @@ const ITEM_LIST_PATH = './files/item_list.json';
 const { listen, socketIO } = require('./API/server.js');
 const { startPriceWatcher } = require('./modules/index');
 const scheduleTasks = require('./modules/scheduler');
-const { getBptfPrices } = require('./modules/bptfPriceFetcher');
+const { getBptfPrices, getBptfItemPrice, getAllPricedItemNamesWithEffects } = require('./modules/bptfPriceFetcher');
 const EmitQueue = require('./modules/emitQueue');
 const emitQueue = new EmitQueue(socketIO, 20); // 20ms between emits
 emitQueue.start();
@@ -138,10 +138,7 @@ const calculateAndEmitPrices = async () => {
 
   let itemNames;
   if (config.priceAllItems) {
-    // Get all item names from schema
-    itemNames = Object.values(schemaManager.schema.defindexes)
-      .map(def => def.item_name)
-      .filter(Boolean);
+    itemNames = getAllPricedItemNamesWithEffects(external_pricelist, schemaManager);
   } else {
     itemNames = Array.from(getAllowedItemNames());
   }
@@ -168,10 +165,6 @@ const calculateAndEmitPrices = async () => {
       emitQueue.enqueue(item);
     } catch (e) {
       console.log("Couldn't create a price for " + name);
-    }
-    // Throttle to avoid event loop blocking
-    if (item_objects.length % 200 === 0) {
-      await Methods.waitXSeconds(0.1);
     }
   }
 };

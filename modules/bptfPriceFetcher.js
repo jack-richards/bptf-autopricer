@@ -58,4 +58,60 @@ function getBptfItemPrice(items, sku) {
   }
 }
 
-module.exports = { getBptfPrices, getBptfItemPrice };
+function getAllPricedItemNamesWithEffects(external_pricelist, schemaManager) {
+  const names = [];
+  const qualities = schemaManager.schema.qualities || {};
+  const qualitiesById = {};
+  for (const [name, id] of Object.entries(qualities)) {
+    qualitiesById[id] = name.charAt(0).toUpperCase() + name.slice(1);
+  }
+  // Build effect ID -> name map using getUnusualEffects()
+  const effectArray = schemaManager.schema.getUnusualEffects();
+  const effects = {};
+  for (const { id, name } of effectArray) {
+    effects[id] = name;
+  }
+
+  const killstreakTiers = [
+    null,
+    'Killstreak',
+    'Specialized Killstreak',
+    'Professional Killstreak'
+  ];
+
+  for (const itemName in external_pricelist) {
+    const item = external_pricelist[itemName];
+    for (const qualityId in item.prices) {
+      const qualityObj = item.prices[qualityId];
+      const qualityName = qualitiesById[qualityId] || '';
+      if (qualityObj.Tradable) {
+        for (const craftType in qualityObj.Tradable) {
+          const arrOrObj = qualityObj.Tradable[craftType];
+          // Unusuals and rare qualities: Craftable is an object keyed by effect ID
+          if (typeof arrOrObj === 'object' && !Array.isArray(arrOrObj)) {
+            for (const effectId in arrOrObj) {
+              const effectName = effects[effectId] || effectId;
+              for (const ks of killstreakTiers) {
+                const ksPrefix = ks ? ks + ' ' : '';
+                // Only add quality if not Unique (6) and not Unusual (5)
+                const prefix = (qualityId !== '6' && qualityId !== '5') ? qualityName + ' ' : '';
+                // Compose: "Professional Killstreak Burning Flames Strange Item"
+                names.push(`${ksPrefix}${effectName} ${prefix}${itemName}`.trim());
+              }
+            }
+          } else if (Array.isArray(arrOrObj)) {
+            for (const ks of killstreakTiers) {
+              const ksPrefix = ks ? ks + ' ' : '';
+              // Only add quality if not Unique (6) and not Unusual (5)
+              const prefix = (qualityId !== '6' && qualityId !== '5') ? qualityName + ' ' : '';
+              names.push(`${ksPrefix}${prefix}${itemName}`.trim());
+            }
+          }
+        }
+      }
+    }
+  }
+  return [...new Set(names)];
+}
+
+module.exports = { getBptfPrices, getBptfItemPrice, getAllPricedItemNamesWithEffects };
