@@ -9,6 +9,44 @@ const lock = new AsyncLock();
 const config = require('./config.json');
 const CACHE_FILE_PATH = path.resolve(__dirname, 'cached-pricelist.json');
 
+const { getBptfItemPrice } = require('./modules/bptfPriceFetcher');
+
+// Returns true if baseline is OK, false if too different
+Methods.prototype.calculateBptfBaselineDifference = function (
+  bptfItems,
+  final_buyObj,
+  final_sellObj,
+  keyobj,
+  sku
+) {
+  // Allow all prices for unusuals (quality 5) and rare qualities (e.g. 11, 13, 14, 15, 16, 17, 18)
+  const quality = sku.split(';')[1];
+  const rareQualities = ['5', '14'];
+  if (rareQualities.includes(quality)) return true;
+
+  const bptfPrice = getBptfItemPrice(bptfItems, sku);
+  if (!bptfPrice) return true; // No baseline, allow
+
+  // Backpack.tf prices can be in keys or metal
+  let bptfBuy = bptfPrice.value;
+  let bptfSell = bptfPrice.value_high || bptfPrice.value;
+  if (bptfPrice.currency === 'keys') {
+    bptfBuy = bptfBuy * keyobj.metal;
+    bptfSell = bptfSell * keyobj.metal;
+  }
+
+  const ourBuy = this.toMetal(final_buyObj, keyobj.metal);
+  const ourSell = this.toMetal(final_sellObj, keyobj.metal);
+
+  // Calculate % difference
+  const buyDiff = Math.abs((ourBuy - bptfBuy) / bptfBuy);
+  const sellDiff = Math.abs((ourSell - bptfSell) / bptfSell);
+
+  if (buyDiff > (config.maxPercentageDifferences?.buy ?? 0.1)) return false;
+  if (sellDiff > (config.maxPercentageDifferences?.sell ?? 0.1)) return false;
+  return true;
+};
+
 Methods.prototype.halfScrapToRefined = function (halfscrap) {
   var refined = parseFloat((halfscrap / 18).toString().match(/^-?\d+(?:\.\d{0,2})?/)[0]);
   return refined;
@@ -65,19 +103,71 @@ Methods.prototype.calculatePercentageDifference = function (value1, value2) {
   return ((value2 - value1) / Math.abs(value1)) * 100;
 };
 
-Methods.prototype.getItemPriceFromExternalPricelist = function (sku, external_pricelist) {
-  let items = external_pricelist.items;
+Methods.prototype.getItemPriceFromExternalPricelist = function (sku, external_pricelist, keyPrice, schemaManager) {
+  const priceObj = getBptfItemPrice(external_pricelist, sku);
 
-  for (const item of items) {
-    if (item.sku === sku) {
-      var pricetfItem = item;
-      // Source is autobot, no real formatting needed.
-      return {
-        pricetfItem,
-      };
-    }
+  const item = schemaManager.schema.getItemBySKU(sku);
+  const name = item ? item.item_name : sku;
+
+  if (!priceObj || typeof priceObj.value !== 'number') {
+    return {
+      pricetfItem: {
+        name,
+        sku,
+        source: 'bptf',
+        buy: { keys: null, metal: null },
+        sell: { keys: null, metal: null },
+        time: Math.floor(Date.now() / 1000),
+      }
+    };
   }
-  throw new Error('Item not found in external pricelist.');
+
+  // Special case for Mann Co. Supply Crate Key
+  if (sku === '5021;6') {
+    return {
+      pricetfItem: {
+        name,
+        sku,
+        source: 'bptf',
+        buy: { keys: 0, metal: priceObj.value },
+        sell: { keys: 0, metal: priceObj.value },
+        time: Math.floor(Date.now() / 1000),
+      }
+    };
+  }
+  // Ensure priceObj has the expected structure
+  if (!priceObj) throw new Error('Item not found in backpack.tf pricelist.');
+
+  // Determine value in metal
+  let value = priceObj.value;
+  if (priceObj.currency === 'keys') {
+    value = value * keyPrice;
+  }
+
+  // Calculate buy/sell with ±10% offset
+  const buyValue = value * 0.9;
+  const sellValue = value * 1.1;
+
+  // Convert back to keys/metal
+  const buy = {
+    keys: Math.floor(buyValue / keyPrice),
+    metal: +(buyValue % keyPrice).toFixed(2),
+  };
+  const sell = {
+    keys: Math.floor(sellValue / keyPrice),
+    metal: +(sellValue % keyPrice).toFixed(2),
+  };
+
+  return {
+    pricetfItem: {
+      name,
+      sku,
+      buy,
+      sell,
+      source: 'bptf',
+      time: priceObj.last_update || Math.floor(Date.now() / 1000),
+    }
+  };
 };
 
 // Calculate percentage differences and decide on rejecting or accepting the autopricers price
@@ -88,6 +178,18 @@ Methods.prototype.calculatePricingAPIDifferences = function (
   final_sellObj,
   keyobj
 ) {
+  // Unusual/rare quality clause
+  const rareQualities = ['5', '14'];
+  if (pricetfItem.sku) {
+    const quality = pricetfItem.sku.split(';')[1];
+    if (rareQualities.includes(quality)) {
+      // Only allow if buy is not more than sell
+      const buyInMetal = this.toMetal(final_buyObj, keyobj.metal);
+      const sellInMetal = this.toMetal(final_sellObj, keyobj.metal);
+      return buyInMetal <= sellInMetal;
+    }
+  }
+
   var percentageDifferences = {};
 
   var sell_Price_In_Metal = this.toMetal(final_sellObj, keyobj.metal);
@@ -199,6 +301,26 @@ const comparePrices = (item1, item2) => {
   return item1.keys === item2.keys && item1.metal === item2.metal;
 };
 
+function sleepSync(ms) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {}
+}
+
+function safeRenameSync(src, dest, retries = 5, delay = 100) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      fs.renameSync(src, dest);
+      return;
+    } catch (err) {
+      if (err.code === 'EPERM' && i < retries - 1) {
+        sleepSync(delay); // Use busy-wait sleep instead of Atomics
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
 Methods.prototype.addToPricelist = function (item, PRICELIST_PATH) {
   try {
     lock.acquire('pricelist', () => {
@@ -215,12 +337,6 @@ Methods.prototype.addToPricelist = function (item, PRICELIST_PATH) {
         return;
       }
 
-      // Sanity check: prevent absurd prices
-      if (item.sell.metal > 1000 || item.buy.metal > 1000) {
-        console.error(`[ERROR] Abnormal price for ${item.name}:`, item);
-        return;
-      }
-
       const existingIndex = items.findIndex((pricelist_item) => pricelist_item.sku === item.sku);
 
       if (existingIndex !== -1) {
@@ -234,7 +350,7 @@ Methods.prototype.addToPricelist = function (item, PRICELIST_PATH) {
       // Atomic write
       const tempPath = PRICELIST_PATH + '.tmp';
       fs.writeFileSync(tempPath, JSON.stringify(existingData, null, 2), 'utf8');
-      fs.renameSync(tempPath, PRICELIST_PATH);
+      safeRenameSync(tempPath, PRICELIST_PATH);
     });
   } catch (error) {
     console.error('Error:', error);
@@ -324,63 +440,23 @@ Methods.prototype.getKeyPriceFromPricesTF = async function () {
   }
 };
 
-Methods.prototype.getKeyFromExternalAPI = async function () {
-  let key_object = {};
-
-  try {
-    const axiosConfig = await this.getJWTFromPricesTF(1, 100);
-
-    let tries = 1;
-    while (tries <= 5) {
-      const response = await axios.get('https://api2.prices.tf/prices/5021;6', axiosConfig);
-
-      if (response.status === 200) {
-        key_object.name = 'Mann Co. Supply Crate Key';
-        key_object.sku = '5021;6';
-        key_object.source = 'bptf';
-
-        let buyKeys = Object.is(response.data.buyKeys, undefined) ? 0 : response.data.buyKeys;
-
-        let buyMetal = this.halfScrapToRefined(
-          Object.is(response.data.buyHalfScrap, undefined) ? 0 : response.data.buyHalfScrap
-        );
-
-        buyMetal = this.getRight(buyMetal);
-
-        key_object.buy = {
-          keys: buyKeys,
-          metal: buyMetal,
-        };
-
-        let sellKeys = Object.is(response.data.sellKeys, undefined) ? 0 : response.data.sellKeys;
-
-        let sellMetal = this.halfScrapToRefined(
-          Object.is(response.data.sellHalfScrap, undefined) ? 0 : response.data.sellHalfScrap
-        );
-
-        sellMetal = this.getRight(sellMetal);
-
-        key_object.sell = {
-          keys: sellKeys,
-          metal: sellMetal,
-        };
-
-        key_object.time = Math.floor(Date.now() / 1000);
-
-        return key_object;
-      }
-
-      // Wait 10 seconds between retries. I want to ensure that this succeeds as the key price is very important.
-      await this.waitXSeconds(10);
-      tries++;
-    }
-
-    throw new Error(
-      'Failed to get key price from Prices.TF. It is either down or we are being rate-limited.'
-    );
-  } catch (error) {
-    throw error;
-  }
+Methods.prototype.getKeyFromExternalAPI = async function (external_pricelist, keyPrice, schemaManager) {
+  // Always use the backpack.tf cached pricelist for the key price
+  const { pricetfItem } = this.getItemPriceFromExternalPricelist('5021;6', external_pricelist, keyPrice, schemaManager);
+  return {
+    name: 'Mann Co. Supply Crate Key',
+    sku: '5021;6',
+    source: 'bptf',
+    buy: {
+      keys: pricetfItem.buy.keys,
+      metal: pricetfItem.buy.metal,
+    },
+    sell: {
+      keys: pricetfItem.sell.keys,
+      metal: pricetfItem.sell.metal,
+    },
+    time: Math.floor(Date.now() / 1000),
+  };
 };
 
 Methods.prototype.getExternalPricelist = async function () {
