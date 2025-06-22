@@ -10,6 +10,7 @@ function logWebSocketEvent(logFile, message) {
 
 function initBptfWebSocket({
   getAllowedItemNames,
+  allowAllItems,
   schemaManager,
   Methods,
   insertListing,
@@ -32,7 +33,7 @@ function initBptfWebSocket({
       console.log('[WebSocket] Ignored event:', e);
       return;
     }
-    if (getAllowedItemNames().has(e.payload.item.name)) {
+    if (allowAllItems() || getAllowedItemNames().has(e.payload.item.name)) {
       let response_item = e.payload.item;
       let steamid = e.payload.steamid;
       let intent = e.payload.intent;

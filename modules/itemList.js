@@ -1,7 +1,7 @@
 const fs = require('fs');
 const chokidar = require('chokidar');
 
-function createItemListManager(ITEM_LIST_PATH) {
+function createItemListManager(ITEM_LIST_PATH, config) {
   let allowedItemNames = new Set();
   let itemBounds = new Map();
 
@@ -43,6 +43,7 @@ function createItemListManager(ITEM_LIST_PATH) {
     watchItemList,
     getAllowedItemNames: () => allowedItemNames,
     getItemBounds: () => itemBounds,
+    allowAllItems: () => config.priceAllItems === true,
   };
 }
 

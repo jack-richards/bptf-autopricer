@@ -1,6 +1,6 @@
 async function insertKeyPrice(db, keyobj, buyPrice, sellPrice, timestamp) {
-  const lowerBound = keyobj.metal * 0.9;
-  const upperBound = keyobj.metal * 1.1;
+  const lowerBound = keyobj.metal * 0.8; // 20% lower than the key's metal value
+  const upperBound = keyobj.metal * 1.2; // 20% higher than the key's metal value
 
   if (
     buyPrice < lowerBound ||

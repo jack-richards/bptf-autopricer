@@ -18,6 +18,10 @@ const { listen, socketIO } = require('./API/server.js');
 const { startPriceWatcher } = require('./modules/index');
 const scheduleTasks = require('./modules/scheduler');
 
+const EmitQueue = require('./modules/emitQueue');
+const emitQueue = new EmitQueue(socketIO, 20); // 20ms between emits
+emitQueue.start();
+
 const {
   sendPriceAlert,
   cleanupOldKeyPrices,
@@ -150,8 +154,8 @@ const { initBptfWebSocket } = require('./websocket/bptfWebSocket');
 
 // Load item names and bounds from item_list.json
 const createItemListManager = require('./modules/itemList');
-const itemListManager = createItemListManager(ITEM_LIST_PATH);
-const { loadNames, watchItemList, getAllowedItemNames, getItemBounds } = itemListManager;
+const itemListManager = createItemListManager(ITEM_LIST_PATH, config);
+const { loadNames, watchItemList, getAllowedItemNames, getItemBounds, allowAllItems } = itemListManager;
 watchItemList();
 
 const calculateAndEmitPrices = async () => {
@@ -186,18 +190,14 @@ const calculateAndEmitPrices = async () => {
         continue;
       }
       Methods.addToPricelist(item, PRICELIST_PATH);
-      item_objects.push(item);
+      emitQueue.enqueue(item);
     } catch (e) {
       console.log("Couldn't create a price for " + name);
     }
     // Throttle to avoid event loop blocking
-    if (item_objects.length % 100 === 0) {
-      await Methods.waitXSeconds(0.5);
+    if (item_objects.length % 200 === 0) {
+      await Methods.waitXSeconds(0.1);
     }
-  }
-  for (const item of item_objects) {
-    await Methods.waitXSeconds(0.01); // Small delay to avoid flooding
-    socketIO.emit('price', item);
   }
 };
 
@@ -702,6 +702,7 @@ const finalisePrice = async (arr, name, sku) => {
 // Initialize the websocket and pass in dependencies
 const rws = initBptfWebSocket({
   getAllowedItemNames,
+  allowAllItems,
   schemaManager,
   Methods,
   insertListing: (...args) => insertListing(db, updateListingStats, ...args),
