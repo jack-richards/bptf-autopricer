@@ -2,6 +2,60 @@ const getListings = async (db, name, intent) => {
   return await db.result('SELECT * FROM listings WHERE name = $1 AND intent = $2', [name, intent]);
 };
 
+const insertListingsBatch = async (
+  pgp,
+  db,
+  updateListingStats,
+  listings // Array of [response_item, sku, currencies, intent, steamid]
+) => {
+  if (listings.length === 0) return;
+
+  // Deduplicate: keep only the last occurrence for each unique key
+  const dedupedMap = new Map();
+  for (const entry of listings) {
+    const [response_item, sku, currencies, intent, steamid] = entry;
+    const key = `${response_item.name}|${sku}|${intent}|${steamid}`;
+    dedupedMap.set(key, entry); // overwrites previous, so last wins
+  }
+  const dedupedListings = Array.from(dedupedMap.values());
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const values = dedupedListings.map(([response_item, sku, currencies, intent, steamid]) => [
+    response_item.name,
+    sku,
+    JSON.stringify(currencies),
+    intent,
+    timestamp,
+    steamid
+  ]);
+
+  // Use pg-promise helpers for batch insert
+  const cs = new pgp.helpers.ColumnSet(
+    ['name', 'sku', 'currencies', 'intent', 'updated', 'steamid'],
+    { table: 'listings' }
+  );
+  const query =
+    pgp.helpers.insert(
+      values.map(v => ({
+        name: v[0],
+        sku: v[1],
+        currencies: v[2],
+        intent: v[3],
+        updated: v[4],
+        steamid: v[5]
+      })),
+      cs
+    ) +
+    ` ON CONFLICT (name, sku, intent, steamid)
+      DO UPDATE SET currencies = EXCLUDED.currencies, updated = EXCLUDED.updated;`;
+
+  await db.none(query);
+
+  // Optionally, update stats for all unique skus
+  const uniqueSkus = [...new Set(values.map(v => v[1]))];
+  await Promise.all(uniqueSkus.map(sku => updateListingStats(db, sku)));
+};
+
 const insertListing = async (
   db,
   updateListingStats,
@@ -169,6 +223,7 @@ const deleteOldListings = async (db) => {
 module.exports = {
   getListings,
   insertListing,
+  insertListingsBatch,
   deleteRemovedListing,
   deleteOldListings,
 };

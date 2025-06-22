@@ -1,3 +1,5 @@
+const pLimit = require('p-limit').default;
+
 async function updateMovingAverages(db, pgp, alpha = 0.35) {
   if (alpha <= 0 || alpha > 1) {
     throw new Error('Alpha must be between 0 (exclusive) and 1 (inclusive).');
@@ -105,13 +107,17 @@ async function updateListingStats(db, sku) {
     `,
     [sku, overall, buy, sell]
   );
+  console.log(`Updated stats for SKU ${sku}: overall=${overall}, buy=${buy}, sell=${sell}`);
 }
 
 async function initializeListingStats(db) {
   const skus = await db.any('SELECT DISTINCT sku FROM listings');
-  for (const { sku } of skus) {
-    await updateListingStats(db, sku);
-  }
+  console.log(`Initializing listing stats for ${skus.length} SKUs...`);
+  const limit = pLimit(10);
+  await Promise.all(
+    skus.map(({ sku }) => limit(() => updateListingStats(db, sku)))
+  );
+  console.log('Listing stats initialized.');
 }
 
 module.exports = {

@@ -1,6 +1,7 @@
 // This file is part of the BPTF Autopricer project.
 // It is a Node.js application that connects to Backpack.tf's WebSocket API,
 const fs = require('fs');
+const pLimit = require('p-limit').default; // For limiting concurrent operations
 const chokidar = require('chokidar');
 const methods = require('./methods');
 const Methods = new methods();
@@ -39,6 +40,7 @@ const {
 const {
   getListings,
   insertListing,
+  insertListingsBatch,
   deleteRemovedListing,
   deleteOldListings,
 } = require('./modules/listings');
@@ -133,39 +135,84 @@ const itemListManager = createItemListManager(ITEM_LIST_PATH, config);
 const { loadNames, watchItemList, getAllowedItemNames, getItemBounds, allowAllItems } = itemListManager;
 watchItemList();
 
+async function getPricableItems(db) {
+  const rows = await db.any(`
+    SELECT sku FROM listing_stats
+    WHERE current_buy_count > 3 AND current_sell_count > 3
+  `);
+  return rows.map(r => r.sku);
+}
+
 const calculateAndEmitPrices = async () => {
   await deleteOldListings(db);
 
   let itemNames;
   if (config.priceAllItems) {
-    itemNames = getAllPricedItemNamesWithEffects(external_pricelist, schemaManager);
+    const pricableSkus = await getPricableItems(db);
+    const pricableSkuSet = new Set(pricableSkus);
+    // Get all item names as usual
+    let allItemNames = getAllPricedItemNamesWithEffects(external_pricelist, schemaManager);
+    // Only keep names whose SKU is in the pricable set
+    itemNames = allItemNames.filter(name => pricableSkuSet.has(schemaManager.schema.getSkuFromName(name)));
   } else {
     itemNames = Array.from(getAllowedItemNames());
   }
 
-  let item_objects = [];
-  for (const name of itemNames) {
+  const limit = pLimit(15); // Limit concurrency to 15, adjust as needed
+  const priceHistoryEntries = [];
+  const itemsToWrite = [];
+
+  await Promise.allSettled(itemNames.map(name => limit(async () => {
     try {
       let sku = schemaManager.schema.getSkuFromName(name);
       let arr = await determinePrice(name, sku);
-      let item = await finalisePrice(arr, name, sku);
-      if (!item) continue;
+      let result = await finalisePrice(arr, name, sku);
+      let item = result.item
+      if (!result || !result.item) return;
       if ((item.buy.keys === 0 && item.buy.metal === 0) ||
           (item.sell.keys === 0 && item.sell.metal === 0)) {
-        continue;
+        return;
       }
+      // If the item is key add to the right place and skip it.
       if (sku === '5021;6') {
         const buyPrice = item.buy.metal;
         const sellPrice = item.sell.metal;
         const timestamp = Math.floor(Date.now() / 1000);
         await insertKeyPrice(db, keyobj, buyPrice, sellPrice, timestamp);
-        continue;
+        return;
       }
-      Methods.addToPricelist(item, PRICELIST_PATH);
+      itemsToWrite.push(item);
+      priceHistoryEntries.push(result.priceHistory);
       emitQueue.enqueue(item);
     } catch (e) {
       console.log("Couldn't create a price for " + name);
     }
+  })));
+
+  // Batch write pricelist at the end
+  try {
+    // Read current pricelist
+    const pricelist = JSON.parse(fs.readFileSync(PRICELIST_PATH, 'utf8'));
+    // Remove items with the same SKU as those we're updating
+    const updatedSkus = new Set(itemsToWrite.map(i => i.sku));
+    const filtered = pricelist.items.filter(i => !updatedSkus.has(i.sku));
+    // Add new/updated items
+    pricelist.items = [...filtered, ...itemsToWrite];
+    // Write back to file
+    fs.writeFileSync(PRICELIST_PATH, JSON.stringify(pricelist, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Failed to batch write pricelist:', err);
+  }
+
+  // After all items processed, batch insert price history:
+  if (priceHistoryEntries.length > 0) {
+    const cs = new pgp.helpers.ColumnSet(['sku', 'buy_metal', 'sell_metal'], { table: 'price_history' });
+    const values = priceHistoryEntries.map(e => ({
+      sku: e.sku,
+      buy_metal: e.buy,
+      sell_metal: e.sell
+    }));
+    await db.none(pgp.helpers.insert(values, cs) + ' ON CONFLICT DO NOTHING');
   }
 };
 
@@ -185,12 +232,15 @@ schemaManager.init(async function (err) {
   external_pricelist = await getBptfPrices();//await Methods.getExternalPricelist();
   // Update key object.
   await updateKeyObject();
+  console.log(`Key object initialised to bptf base: ${JSON.stringify(keyobj)}`);
   // Get external pricelist.
   //external_pricelist = await Methods.getExternalPricelist();
   // Calculate and emit prices on startup.
   await calculateAndEmitPrices();
+  console.log('Prices calculated and emitted on startup.');
   // Call this once at startup if needed
   await initializeListingStats(db);
+  console.log('Listing stats initialized.');
   //InitialKeyPricingContinued
   await checkKeyPriceStability({
     db,
@@ -201,6 +251,7 @@ schemaManager.init(async function (err) {
     PRICELIST_PATH,
     socketIO,
   });
+  console.log('Key price stability check completed.');
 
   // Start scheduled tasks after everything is ready
   scheduleTasks({
@@ -228,8 +279,10 @@ schemaManager.init(async function (err) {
     db,
     pgp,
   });
+  console.log('Scheduled tasks started.');
 
   startPriceWatcher();
+  console.log('PriceWatcher started.');
 });
 
 async function isPriceSwingAcceptable(prev, next, sku) {
@@ -653,13 +706,7 @@ const finalisePrice = async (arr, name, sku) => {
       }
 
       // Save to price history
-      await db.none(
-        'INSERT INTO price_history (sku, buy_metal, sell_metal, timestamp) VALUES ($1, $2, $3, NOW())',
-        [sku, Methods.toMetal(item.buy, keyobj.metal), Methods.toMetal(item.sell, keyobj.metal)]
-      );
-
-      // Return the new item object with the latest price.
-      return item;
+      return { item, priceHistory: { sku, buy: Methods.toMetal(item.buy, keyobj.metal), sell: Methods.toMetal(item.sell, keyobj.metal) } };
     }
   } catch (err) {
     // If the autopricer failed to price the item, we don't update the items price.
@@ -674,6 +721,7 @@ const rws = initBptfWebSocket({
   schemaManager,
   Methods,
   insertListing: (...args) => insertListing(db, updateListingStats, ...args),
+  insertListingsBatch: (listings) => insertListingsBatch(pgp ,db, updateListingStats, listings),
   deleteRemovedListing: (...args) => deleteRemovedListing(db, updateListingStats, ...args),
   excludedSteamIds,
   excludedListingDescriptions,

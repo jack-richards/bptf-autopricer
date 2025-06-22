@@ -3,6 +3,10 @@ const ws = require('ws');
 const fs = require('fs');
 const path = require('path');
 
+let insertQueue = [];
+let insertTimer = null;
+const INSERT_BATCH_INTERVAL = 10000; // ms
+
 function logWebSocketEvent(logFile, message) {
   const timestamp = new Date().toISOString();
   fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`);
@@ -14,6 +18,7 @@ function initBptfWebSocket({
   schemaManager,
   Methods,
   insertListing,
+  insertListingsBatch,
   deleteRemovedListing,
   excludedSteamIds,
   excludedListingDescriptions,
@@ -26,6 +31,25 @@ function initBptfWebSocket({
       'batch-test': true,
     },
   });
+
+  async function flushInsertQueue() {
+    if (insertQueue.length === 0) return;
+    try {
+      await insertListingsBatch(insertQueue);
+    } catch (err) {
+      console.error('[WebSocket] Batch insert error:', err);
+    }
+    insertQueue = [];
+    insertTimer = null;
+  }
+
+  function queueInsertListing(...args) {
+    insertQueue.push(args);
+    if (!insertTimer) {
+      insertTimer = setTimeout(flushInsertQueue, INSERT_BATCH_INTERVAL);
+    }
+  }
+
 
   function handleEvent(e) {
     if (!e.payload || !e.payload.item || !e.payload.item.name) {
@@ -86,7 +110,7 @@ function initBptfWebSocket({
                     `| UPDATING PRICES |: Couldn't price ${response_item.name}. Issue with retrieving this items defindex.`
                   );
                 }
-                insertListing(response_item, sku, currencies, intent, steamid);
+                queueInsertListing(response_item, sku, currencies, intent, steamid);
               } catch (e) {
                 console.log(e);
                 console.log("Couldn't create a price for " + response_item.name);

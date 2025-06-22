@@ -73,10 +73,10 @@ function getAllPricedItemNamesWithEffects(external_pricelist, schemaManager) {
   }
 
   const killstreakTiers = [
-    null,
-    'Killstreak',
-    'Specialized Killstreak',
-    'Professional Killstreak'
+    null//,//Temp removal while looking for a better way to handle killstreak items basically fuck this rn
+    //'Killstreak',
+    //'Specialized Killstreak',
+    //'Professional Killstreak'
   ];
 
   for (const itemName in external_pricelist) {
