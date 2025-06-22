@@ -15,8 +15,14 @@
     "buy": 5,
     "sell": -8
   },
+  "minSellMargin": 0.11,
+  "priceSwingLimits": {
+    "maxBuyIncrease": 0.1,
+    "maxSellDecrease": 0.1
+  },
   "alwaysQuerySnapshotAPI": true,
   "fallbackOntoPricesTf": false,
+  "priceAllItems": false,
   "excludedSteamIDs": [
     "76561199384015307",
     "76561199495073910",
