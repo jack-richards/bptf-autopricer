@@ -64,7 +64,6 @@ function getBptfItemPrice(items, sku) {
       return effectObj;
     }
   }
-
   // For non-unusuals, Craftable is an array or object
   if (Array.isArray(tradable.Craftable)) {
     return tradable.Craftable[0];
