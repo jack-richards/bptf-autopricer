@@ -114,9 +114,7 @@ async function initializeListingStats(db) {
   const skus = await db.any('SELECT DISTINCT sku FROM listings');
   console.log(`Initializing listing stats for ${skus.length} SKUs...`);
   const limit = pLimit(10);
-  await Promise.all(
-    skus.map(({ sku }) => limit(() => updateListingStats(db, sku)))
-  );
+  await Promise.all(skus.map(({ sku }) => limit(() => updateListingStats(db, sku))));
   console.log('Listing stats initialized.');
 }
 

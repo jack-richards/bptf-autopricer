@@ -11,7 +11,7 @@ const CONFIG_PATH = path.resolve(__dirname, '../pricerConfig.json');
 let config;
 try {
   config = loadJson(CONFIG_PATH);
-} catch (e) {
+} catch {
   config = {
     pm2ProcessName: 'tf2autobot',
     tf2AutobotDir: '../../tf2autobot-5.13.0',

@@ -10,7 +10,9 @@ class EmitQueue extends EventEmitter {
   }
 
   start() {
-    if (this.running) return;
+    if (this.running) {
+      return;
+    }
     this.running = true;
     this._process();
   }
@@ -24,7 +26,9 @@ class EmitQueue extends EventEmitter {
   }
 
   _process() {
-    if (!this.running) return;
+    if (!this.running) {
+      return;
+    }
     if (this.queue.length > 0) {
       const item = this.queue.shift();
       this.socketIO.emit('price', item);

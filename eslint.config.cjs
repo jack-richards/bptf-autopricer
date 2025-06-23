@@ -1,8 +1,8 @@
-import js from '@eslint/js';
-import prettier from 'eslint-config-prettier';
-import eslintPluginPrettier from 'eslint-plugin-prettier';
+const js = require('@eslint/js');
+const prettier = require('eslint-config-prettier');
+const eslintPluginPrettier = require('eslint-plugin-prettier');
 
-export default [
+module.exports = [
   js.configs.recommended,
   prettier,
   {
@@ -19,6 +19,8 @@ export default [
         require: 'readonly',
         process: 'readonly',
         __dirname: 'readonly',
+        setTimeout: 'readonly',
+        setInterval: 'readonly',
       },
     },
     plugins: {

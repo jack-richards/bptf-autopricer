@@ -36,16 +36,22 @@ function getBptfItemPrice(items, sku) {
   const effect = effectPart && effectPart.startsWith('u') ? effectPart.slice(1) : null;
 
   // Find item by defindex (as number)
-  const item = Object.values(items).find(i => i.defindex && i.defindex.includes(Number(defindex)));
-  if (!item || !item.prices || !item.prices[quality]) return null;
+  const item = Object.values(items).find(
+    (i) => i.defindex && i.defindex.includes(Number(defindex))
+  );
+  if (!item || !item.prices || !item.prices[quality]) {
+    return null;
+  }
 
   const tradable = item.prices[quality].Tradable;
-  if (!tradable || !tradable.Craftable) return null;
+  if (!tradable || !tradable.Craftable) {
+    return null;
+  }
 
   // For unusuals, find the correct effect
   if (quality === '5' && effect) {
     // Craftable is an array for unusuals
-    const effectObj = tradable.Craftable.find(e => String(e.effect) === effect);
+    const effectObj = tradable.Craftable.find((e) => String(e.effect) === effect);
     return effectObj || tradable.Craftable[0];
   }
 
@@ -73,7 +79,7 @@ function getAllPricedItemNamesWithEffects(external_pricelist, schemaManager) {
   }
 
   const killstreakTiers = [
-    null//,//Temp removal while looking for a better way to handle killstreak items basically fuck this rn
+    null, //,//Temp removal while looking for a better way to handle killstreak items basically fuck this rn
     //'Killstreak',
     //'Specialized Killstreak',
     //'Professional Killstreak'
@@ -94,7 +100,7 @@ function getAllPricedItemNamesWithEffects(external_pricelist, schemaManager) {
               for (const ks of killstreakTiers) {
                 const ksPrefix = ks ? ks + ' ' : '';
                 // Only add quality if not Unique (6) and not Unusual (5)
-                const prefix = (qualityId !== '6' && qualityId !== '5') ? qualityName + ' ' : '';
+                const prefix = qualityId !== '6' && qualityId !== '5' ? qualityName + ' ' : '';
                 // Compose: "Professional Killstreak Burning Flames Strange Item"
                 names.push(`${ksPrefix}${effectName} ${prefix}${itemName}`.trim());
               }
@@ -103,7 +109,7 @@ function getAllPricedItemNamesWithEffects(external_pricelist, schemaManager) {
             for (const ks of killstreakTiers) {
               const ksPrefix = ks ? ks + ' ' : '';
               // Only add quality if not Unique (6) and not Unusual (5)
-              const prefix = (qualityId !== '6' && qualityId !== '5') ? qualityName + ' ' : '';
+              const prefix = qualityId !== '6' && qualityId !== '5' ? qualityName + ' ' : '';
               names.push(`${ksPrefix}${prefix}${itemName}`.trim());
             }
           }

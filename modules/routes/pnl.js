@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 // routes/pnl.js
 const express = require('express');
 const path = require('path');
@@ -21,7 +22,7 @@ module.exports = function (app, config) {
     try {
       const raw = fs.readFileSync(pollDataPath, 'utf8');
       parsed = JSON.parse(raw);
-    } catch (e) {
+    } catch {
       return res.status(500).send(renderPage('P&L Dashboard', '<p>Error loading trade data.</p>'));
     }
 

@@ -85,7 +85,7 @@ router.post('/add/:name', (req, res) => {
           break;
         }
       }
-    } catch (e) {
+    } catch {
       return res.sendStatus(400);
     }
 
@@ -128,7 +128,7 @@ router.post('/delete/:name', (req, res) => {
           break;
         }
       }
-    } catch (e) {
+    } catch {
       return res.sendStatus(400);
     }
 

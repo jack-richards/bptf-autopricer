@@ -1,3 +1,5 @@
+/* eslint-disable no-useless-catch */
+/* eslint-disable no-prototype-builtins */
 var Methods = function () {};
 var fs = require('fs');
 const path = require('path');
@@ -22,10 +24,14 @@ Methods.prototype.calculateBptfBaselineDifference = function (
   // Allow all prices for unusuals (quality 5) and rare qualities (e.g. 11, 13, 14, 15, 16, 17, 18)
   const quality = sku.split(';')[1];
   const rareQualities = ['5', '14'];
-  if (rareQualities.includes(quality)) return true;
+  if (rareQualities.includes(quality)) {
+    return true;
+  }
 
   const bptfPrice = getBptfItemPrice(bptfItems, sku);
-  if (!bptfPrice) return true; // No baseline, allow
+  if (!bptfPrice) {
+    return true;
+  } // No baseline, allow
 
   // Backpack.tf prices can be in keys or metal
   let bptfBuy = bptfPrice.value;
@@ -42,8 +48,12 @@ Methods.prototype.calculateBptfBaselineDifference = function (
   const buyDiff = Math.abs((ourBuy - bptfBuy) / bptfBuy);
   const sellDiff = Math.abs((ourSell - bptfSell) / bptfSell);
 
-  if (buyDiff > (config.maxPercentageDifferences?.buy ?? 0.1)) return false;
-  if (sellDiff > (config.maxPercentageDifferences?.sell ?? 0.1)) return false;
+  if (buyDiff > (config.maxPercentageDifferences?.buy ?? 0.1)) {
+    return false;
+  }
+  if (sellDiff > (config.maxPercentageDifferences?.sell ?? 0.1)) {
+    return false;
+  }
   return true;
 };
 
@@ -103,7 +113,12 @@ Methods.prototype.calculatePercentageDifference = function (value1, value2) {
   return ((value2 - value1) / Math.abs(value1)) * 100;
 };
 
-Methods.prototype.getItemPriceFromExternalPricelist = function (sku, external_pricelist, keyPrice, schemaManager) {
+Methods.prototype.getItemPriceFromExternalPricelist = function (
+  sku,
+  external_pricelist,
+  keyPrice,
+  schemaManager
+) {
   const priceObj = getBptfItemPrice(external_pricelist, sku);
 
   const item = schemaManager.schema.getItemBySKU(sku);
@@ -118,7 +133,7 @@ Methods.prototype.getItemPriceFromExternalPricelist = function (sku, external_pr
         buy: { keys: null, metal: null },
         sell: { keys: null, metal: null },
         time: Math.floor(Date.now() / 1000),
-      }
+      },
     };
   }
 
@@ -132,11 +147,13 @@ Methods.prototype.getItemPriceFromExternalPricelist = function (sku, external_pr
         buy: { keys: 0, metal: priceObj.value },
         sell: { keys: 0, metal: priceObj.value },
         time: Math.floor(Date.now() / 1000),
-      }
+      },
     };
   }
   // Ensure priceObj has the expected structure
-  if (!priceObj) throw new Error('Item not found in backpack.tf pricelist.');
+  if (!priceObj) {
+    throw new Error('Item not found in backpack.tf pricelist.');
+  }
 
   // Determine value in metal
   let value = priceObj.value;
@@ -166,7 +183,7 @@ Methods.prototype.getItemPriceFromExternalPricelist = function (sku, external_pr
       sell,
       source: 'bptf',
       time: priceObj.last_update || Math.floor(Date.now() / 1000),
-    }
+    },
   };
 };
 
@@ -297,13 +314,15 @@ Methods.prototype.createCurrencyObject = function (obj) {
   return newObj;
 };
 
-const comparePrices = (item1, item2) => {
-  return item1.keys === item2.keys && item1.metal === item2.metal;
-};
+//const comparePrices = (item1, item2) => {
+//  return item1.keys === item2.keys && item1.metal === item2.metal;
+//};
 
 function sleepSync(ms) {
   const end = Date.now() + ms;
-  while (Date.now() < end) {}
+  while (Date.now() < end) {
+    // Busy-wait loop to simulate sleep
+  }
 }
 
 function safeRenameSync(src, dest, retries = 5, delay = 100) {
@@ -440,9 +459,18 @@ Methods.prototype.getKeyPriceFromPricesTF = async function () {
   }
 };
 
-Methods.prototype.getKeyFromExternalAPI = async function (external_pricelist, keyPrice, schemaManager) {
+Methods.prototype.getKeyFromExternalAPI = async function (
+  external_pricelist,
+  keyPrice,
+  schemaManager
+) {
   // Always use the backpack.tf cached pricelist for the key price
-  const { pricetfItem } = this.getItemPriceFromExternalPricelist('5021;6', external_pricelist, keyPrice, schemaManager);
+  const { pricetfItem } = this.getItemPriceFromExternalPricelist(
+    '5021;6',
+    external_pricelist,
+    keyPrice,
+    schemaManager
+  );
   return {
     name: 'Mann Co. Supply Crate Key',
     sku: '5021;6',

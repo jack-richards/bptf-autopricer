@@ -8,12 +8,14 @@ const insertListingsBatch = async (
   updateListingStats,
   listings // Array of [response_item, sku, currencies, intent, steamid]
 ) => {
-  if (listings.length === 0) return;
+  if (listings.length === 0) {
+    return;
+  }
 
   // Deduplicate: keep only the last occurrence for each unique key
   const dedupedMap = new Map();
   for (const entry of listings) {
-    const [response_item, sku, currencies, intent, steamid] = entry;
+    const [response_item, sku, intent, steamid] = entry;
     const key = `${response_item.name}|${sku}|${intent}|${steamid}`;
     dedupedMap.set(key, entry); // overwrites previous, so last wins
   }
@@ -26,7 +28,7 @@ const insertListingsBatch = async (
     JSON.stringify(currencies),
     intent,
     timestamp,
-    steamid
+    steamid,
   ]);
 
   // Use pg-promise helpers for batch insert
@@ -36,13 +38,13 @@ const insertListingsBatch = async (
   );
   const query =
     pgp.helpers.insert(
-      values.map(v => ({
+      values.map((v) => ({
         name: v[0],
         sku: v[1],
         currencies: v[2],
         intent: v[3],
         updated: v[4],
-        steamid: v[5]
+        steamid: v[5],
       })),
       cs
     ) +
@@ -52,8 +54,8 @@ const insertListingsBatch = async (
   await db.none(query);
 
   // Optionally, update stats for all unique skus
-  const uniqueSkus = [...new Set(values.map(v => v[1]))];
-  await Promise.all(uniqueSkus.map(sku => updateListingStats(db, sku)));
+  const uniqueSkus = [...new Set(values.map((v) => v[1]))];
+  await Promise.all(uniqueSkus.map((sku) => updateListingStats(db, sku)));
 };
 
 const insertListing = async (

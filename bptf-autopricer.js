@@ -2,7 +2,6 @@
 // It is a Node.js application that connects to Backpack.tf's WebSocket API,
 const fs = require('fs');
 const pLimit = require('p-limit').default; // For limiting concurrent operations
-const chokidar = require('chokidar');
 const methods = require('./methods');
 const Methods = new methods();
 const path = require('path');
@@ -18,7 +17,7 @@ const ITEM_LIST_PATH = './files/item_list.json';
 const { listen, socketIO } = require('./API/server.js');
 const { startPriceWatcher } = require('./modules/index');
 const scheduleTasks = require('./modules/scheduler');
-const { getBptfPrices, getBptfItemPrice, getAllPricedItemNamesWithEffects } = require('./modules/bptfPriceFetcher');
+const { getBptfPrices, getAllPricedItemNamesWithEffects } = require('./modules/bptfPriceFetcher');
 const EmitQueue = require('./modules/emitQueue');
 const emitQueue = new EmitQueue(socketIO, 20); // 20ms between emits
 emitQueue.start();
@@ -31,11 +30,7 @@ const {
   checkKeyPriceStability,
 } = require('./modules/keyPriceUtils');
 
-const {
-  updateMovingAverages,
-  updateListingStats,
-  initializeListingStats,
-} = require('./modules/listingAverages');
+const { updateMovingAverages, updateListingStats } = require('./modules/listingAverages');
 
 const {
   getListings,
@@ -71,7 +66,7 @@ const fallbackOntoPricesTf = config.fallbackOntoPricesTf;
 
 // Create database instance for pg-promise.
 const createDb = require('./modules/db');
-const { db, pgp, cs } = createDb(config);
+const { db, pgp } = createDb(config);
 
 if (fs.existsSync(SCHEMA_PATH)) {
   // A cached schema exists.
@@ -112,11 +107,15 @@ var external_pricelist;
 
 const updateKeyObject = async () => {
   // Always use backpack.tf for key price
-  const key_item = await Methods.getKeyFromExternalAPI(external_pricelist, external_pricelist['5021;6']?.value || 0, schemaManager);
+  const key_item = await Methods.getKeyFromExternalAPI(
+    external_pricelist,
+    external_pricelist['5021;6']?.value || 0,
+    schemaManager
+  );
 
   console.log(`Key item fetched: ${JSON.stringify(key_item)}`);
 
-  await new Promise(res => setTimeout(res, 1000)); // Wait 1 second
+  await new Promise((res) => setTimeout(res, 1000)); // Wait 1 second
 
   Methods.addToPricelist(key_item, PRICELIST_PATH);
 
@@ -132,7 +131,7 @@ const { initBptfWebSocket } = require('./websocket/bptfWebSocket');
 // Load item names and bounds from item_list.json
 const createItemListManager = require('./modules/itemList');
 const itemListManager = createItemListManager(ITEM_LIST_PATH, config);
-const { loadNames, watchItemList, getAllowedItemNames, getItemBounds, allowAllItems } = itemListManager;
+const { watchItemList, getAllowedItemNames, getItemBounds, allowAllItems } = itemListManager;
 watchItemList();
 
 async function getPricableItems(db) {
@@ -140,7 +139,7 @@ async function getPricableItems(db) {
     SELECT sku FROM listing_stats
     WHERE current_buy_count > 3 AND current_sell_count > 3
   `);
-  return rows.map(r => r.sku);
+  return rows.map((r) => r.sku);
 }
 
 const calculateAndEmitPrices = async () => {
@@ -153,7 +152,9 @@ const calculateAndEmitPrices = async () => {
     // Get all item names as usual
     let allItemNames = getAllPricedItemNamesWithEffects(external_pricelist, schemaManager);
     // Only keep names whose SKU is in the pricable set
-    itemNames = allItemNames.filter(name => pricableSkuSet.has(schemaManager.schema.getSkuFromName(name)));
+    itemNames = allItemNames.filter((name) =>
+      pricableSkuSet.has(schemaManager.schema.getSkuFromName(name))
+    );
   } else {
     itemNames = Array.from(getAllowedItemNames());
   }
@@ -162,40 +163,48 @@ const calculateAndEmitPrices = async () => {
   const priceHistoryEntries = [];
   const itemsToWrite = [];
 
-  await Promise.allSettled(itemNames.map(name => limit(async () => {
-    try {
-      let sku = schemaManager.schema.getSkuFromName(name);
-      let arr = await determinePrice(name, sku);
-      let result = await finalisePrice(arr, name, sku);
-      let item = result.item
-      if (!result || !result.item) return;
-      if ((item.buy.keys === 0 && item.buy.metal === 0) ||
-          (item.sell.keys === 0 && item.sell.metal === 0)) {
-        return;
-      }
-      // If the item is key add to the right place and skip it.
-      if (sku === '5021;6') {
-        const buyPrice = item.buy.metal;
-        const sellPrice = item.sell.metal;
-        const timestamp = Math.floor(Date.now() / 1000);
-        await insertKeyPrice(db, keyobj, buyPrice, sellPrice, timestamp);
-        return;
-      }
-      itemsToWrite.push(item);
-      priceHistoryEntries.push(result.priceHistory);
-      emitQueue.enqueue(item);
-    } catch (e) {
-      console.log("Couldn't create a price for " + name + ' due to: ' + e.message);
-    }
-  })));
+  await Promise.allSettled(
+    itemNames.map((name) =>
+      limit(async () => {
+        try {
+          let sku = schemaManager.schema.getSkuFromName(name);
+          let arr = await determinePrice(name, sku);
+          let result = await finalisePrice(arr, name, sku);
+          let item = result.item;
+          if (!result || !result.item) {
+            return;
+          }
+          if (
+            (item.buy.keys === 0 && item.buy.metal === 0) ||
+            (item.sell.keys === 0 && item.sell.metal === 0)
+          ) {
+            return;
+          }
+          // If the item is key add to the right place and skip it.
+          if (sku === '5021;6') {
+            const buyPrice = item.buy.metal;
+            const sellPrice = item.sell.metal;
+            const timestamp = Math.floor(Date.now() / 1000);
+            await insertKeyPrice(db, keyobj, buyPrice, sellPrice, timestamp);
+            return;
+          }
+          itemsToWrite.push(item);
+          priceHistoryEntries.push(result.priceHistory);
+          emitQueue.enqueue(item);
+        } catch (e) {
+          console.log("Couldn't create a price for " + name + ' due to: ' + e.message);
+        }
+      })
+    )
+  );
 
   // Batch write pricelist at the end
   try {
     // Read current pricelist
     const pricelist = JSON.parse(fs.readFileSync(PRICELIST_PATH, 'utf8'));
     // Remove items with the same SKU as those we're updating
-    const updatedSkus = new Set(itemsToWrite.map(i => i.sku));
-    const filtered = pricelist.items.filter(i => !updatedSkus.has(i.sku));
+    const updatedSkus = new Set(itemsToWrite.map((i) => i.sku));
+    const filtered = pricelist.items.filter((i) => !updatedSkus.has(i.sku));
     // Add new/updated items
     pricelist.items = [...filtered, ...itemsToWrite];
     // Write back to file
@@ -206,11 +215,13 @@ const calculateAndEmitPrices = async () => {
 
   // After all items processed, batch insert price history:
   if (priceHistoryEntries.length > 0) {
-    const cs = new pgp.helpers.ColumnSet(['sku', 'buy_metal', 'sell_metal'], { table: 'price_history' });
-    const values = priceHistoryEntries.map(e => ({
+    const cs = new pgp.helpers.ColumnSet(['sku', 'buy_metal', 'sell_metal'], {
+      table: 'price_history',
+    });
+    const values = priceHistoryEntries.map((e) => ({
       sku: e.sku,
       buy_metal: e.buy,
-      sell_metal: e.sell
+      sell_metal: e.sell,
     }));
     await db.none(pgp.helpers.insert(values, cs) + ' ON CONFLICT DO NOTHING');
   }
@@ -229,7 +240,7 @@ schemaManager.init(async function (err) {
   PriceWatcher.watchPrices(pricelistPath /*, ageThresholdSec, intervalSec */);
 
   // Get external pricelist.
-  external_pricelist = await getBptfPrices();//await Methods.getExternalPricelist();
+  external_pricelist = await getBptfPrices(); //await Methods.getExternalPricelist();
   // Update key object.
   await updateKeyObject();
   console.log(`Key object initialised to bptf base: ${JSON.stringify(keyobj)}`);
@@ -256,7 +267,7 @@ schemaManager.init(async function (err) {
   // Start scheduled tasks after everything is ready
   scheduleTasks({
     updateExternalPricelist: async () => {
-      external_pricelist = await getBptfPrices(true);//await Methods.getExternalPricelist();
+      external_pricelist = await getBptfPrices(true); //await Methods.getExternalPricelist();
     },
     calculateAndEmitPrices,
     cleanupOldKeyPrices: async (db) => {
@@ -323,8 +334,13 @@ const determinePrice = async (name, sku) => {
   // Get the price of the item from the in-memory external pricelist.
   var data;
   try {
-    data = Methods.getItemPriceFromExternalPricelist(sku, external_pricelist, keyobj.metal, schemaManager);
-  } catch (e) {
+    data = Methods.getItemPriceFromExternalPricelist(
+      sku,
+      external_pricelist,
+      keyobj.metal,
+      schemaManager
+    );
+  } catch {
     throw new Error(`| UPDATING PRICES |: Couldn't price ${name}. Issue with BPTF baseline`);
   }
 
@@ -472,14 +488,18 @@ async function isSellPriceOutlier(sku, candidateSellMetal, threshold = 3) {
     'SELECT sell_metal FROM price_history WHERE sku = $1 ORDER BY timestamp DESC LIMIT 10',
     [sku]
   );
-  if (history.length < 3) return false; // Not enough data to judge
+  if (history.length < 3) {
+    return false;
+  } // Not enough data to judge
 
-  const prices = history.map(p => Number(p.sell_metal));
+  const prices = history.map((p) => Number(p.sell_metal));
   const mean = prices.reduce((a, b) => a + b, 0) / prices.length;
   const stdDev = Math.sqrt(prices.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / prices.length);
 
   // If stdDev is 0 (all prices the same), only allow exact match
-  if (stdDev === 0) return candidateSellMetal !== mean;
+  if (stdDev === 0) {
+    return candidateSellMetal !== mean;
+  }
 
   const zScore = (candidateSellMetal - mean) / stdDev;
   return Math.abs(zScore) > threshold;
@@ -548,7 +568,9 @@ const getAverages = async (name, buyFiltered, sellFiltered, sku, pricetfItem) =>
         }
       }
       // If all are outliers, fallback to the lowest price anyway (to avoid not pricing at all)
-      if (!picked) picked = sellFiltered[0];
+      if (!picked) {
+        picked = sellFiltered[0];
+      }
       final_sellObj.keys = Object.is(picked.currencies.keys, undefined)
         ? 0
         : picked.currencies.keys;
@@ -706,22 +728,29 @@ const finalisePrice = async (arr, name, sku) => {
       }
 
       // Save to price history
-      return { item, priceHistory: { sku, buy: Methods.toMetal(item.buy, keyobj.metal), sell: Methods.toMetal(item.sell, keyobj.metal) } };
+      return {
+        item,
+        priceHistory: {
+          sku,
+          buy: Methods.toMetal(item.buy, keyobj.metal),
+          sell: Methods.toMetal(item.sell, keyobj.metal),
+        },
+      };
     }
-  } catch (err) {
+  } catch {
     // If the autopricer failed to price the item, we don't update the items price.
     return;
   }
 };
 
 // Initialize the websocket and pass in dependencies
-const rws = initBptfWebSocket({
+initBptfWebSocket({
   getAllowedItemNames,
   allowAllItems,
   schemaManager,
   Methods,
   insertListing: (...args) => insertListing(db, updateListingStats, ...args),
-  insertListingsBatch: (listings) => insertListingsBatch(pgp ,db, updateListingStats, listings),
+  insertListingsBatch: (listings) => insertListingsBatch(pgp, db, updateListingStats, listings),
   deleteRemovedListing: (...args) => deleteRemovedListing(db, updateListingStats, ...args),
   excludedSteamIds,
   excludedListingDescriptions,
