@@ -34,14 +34,30 @@ module.exports = [
       eqeqeq: 'error',
       curly: 'error',
       'prettier/prettier': 'error',
-      'spellcheck/spell-checker': [1, {
-        comments: true,
-        strings: true,
-        identifiers: false,
-        lang: 'en_US',
-        skipWords: ['bptf', 'sku', 'autopricer', 'tf2', 'steamid', 'defindex', 'pricelist', 'Autobot', 'polldata', 'skus', 'keyobj', 'fs', 'utf8'],
-      }],
+      'spellcheck/spell-checker': [
+        1,
+        {
+          comments: true,
+          strings: true,
+          identifiers: false,
+          lang: 'en_US',
+          skipWords: [
+            'bptf',
+            'sku',
+            'autopricer',
+            'tf2',
+            'steamid',
+            'defindex',
+            'pricelist',
+            'Autobot',
+            'polldata',
+            'skus',
+            'keyobj',
+            'fs',
+            'utf8',
+          ],
+        },
+      ],
     },
   },
 ];
-
