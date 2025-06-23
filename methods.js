@@ -1,4 +1,5 @@
 /* eslint-disable no-useless-catch */
+// eslint-disable-next-line spellcheck/spell-checker
 /* eslint-disable no-prototype-builtins */
 var Methods = function () {};
 var fs = require('fs');
@@ -80,7 +81,7 @@ Methods.prototype.getRight = function (v) {
 // the metal cost. It's then rounded down to the nearest 0.11.
 
 // From here, the metal (being both the worth of the keys and the metal value), is
-// divided into the sell price of a key. Totalling the amount of keys that could be
+// divided into the sell price of a key. Totaling the amount of keys that could be
 // afforded with the pure metal value. The metal component is calculated by taking the
 // remainder of the rounded total value divided by keyPrice. This gives the amount of
 // metal that couldn't be converted into a whole key.

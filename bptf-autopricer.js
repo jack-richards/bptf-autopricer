@@ -53,7 +53,7 @@ const schemaManager = new Schema({
 // Steam IDs of bots that we want to ignore listings from.
 const excludedSteamIds = config.excludedSteamIDs;
 
-// Steam IDs of bots that we want to prioritise listings from.
+// Steam IDs of bots that we want to prioritize listings from.
 const prioritySteamIds = config.trustedSteamIDs;
 
 // Listing descriptions that we want to ignore.
