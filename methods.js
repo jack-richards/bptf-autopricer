@@ -200,7 +200,7 @@ Methods.prototype.calculatePricingAPIDifferences = function (
   const rareQualities = ['5', '14'];
   if (pricetfItem.sku) {
     const quality = pricetfItem.sku.split(';')[1];
-    if (rareQualities.includes(quality)) {
+    if (rareQualities.includes(quality) || pricetfItem.sku.includes(';australium')) {
       // Only allow if buy is not more than sell
       const buyInMetal = this.toMetal(final_buyObj, keyobj.metal);
       const sellInMetal = this.toMetal(final_sellObj, keyobj.metal);

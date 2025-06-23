@@ -31,15 +31,36 @@ async function getBptfPrices(force = false) {
 
 // Helper to get price for a specific SKU (handles unusuals and effects)
 function getBptfItemPrice(items, sku) {
-  // SKU (defindex;quality;Effect)
-  const [defindex, quality, effectPart] = sku.split(';');
+  // SKU (defindex;quality;Effect;...;australium)
+  const parts = sku.split(';');
+  const defindex = parts[0];
+  const quality = parts[1];
+  const effectPart = parts[2];
   const effect = effectPart && effectPart.startsWith('u') ? effectPart.slice(1) : null;
+  const isAustralium = parts.includes('australium');
 
-  // Find item by defindex (as number)
-  const item = Object.values(items).find(
-    (i) => i.defindex && i.defindex.includes(Number(defindex))
+  // Find all items with this defindex
+  const candidates = Object.entries(items).filter(([name, item]) =>
+    item.defindex && item.defindex.includes(Number(defindex))
   );
-  if (!item || !item.prices || !item.prices[quality]) {
+
+  // Prefer Australium-named item if SKU has australium
+  let itemEntry;
+  if (isAustralium) {
+    itemEntry = candidates.find(([name]) => name.toLowerCase().includes('australium'));
+  }
+  // Otherwise, prefer non-Australium
+  if (!itemEntry) {
+    itemEntry = candidates.find(([name]) => !name.toLowerCase().includes('australium'));
+  }
+  // Fallback to first candidate
+  if (!itemEntry && candidates.length > 0) {
+    itemEntry = candidates[0];
+  }
+  if (!itemEntry) return null;
+
+  const item = itemEntry[1];
+  if (!item.prices || !item.prices[quality]) {
     return null;
   }
 
@@ -52,19 +73,32 @@ function getBptfItemPrice(items, sku) {
   if (quality === '5' && effect) {
     if (Array.isArray(tradable.Craftable)) {
       // Craftable is an array for unusuals (rare, but handle just in case)
-      const effectObj = tradable.Craftable.find((e) => String(e.effect) === effect);
-      return effectObj || tradable.Craftable[0];
+      const effectObj = tradable.Craftable.find((e) => String(e.effect) === effect && (!isAustralium || e.australium));
+      if (effectObj) return effectObj;
+      // fallback to just effect match
+      const fallbackEffectObj = tradable.Craftable.find((e) => String(e.effect) === effect);
+      return fallbackEffectObj || tradable.Craftable[0];
     } else {
       // Craftable is an object keyed by effect ID
       const craftableArr = Object.entries(tradable.Craftable).map(([effectId, obj]) => ({
         ...obj,
         effect: effectId, // inject effect ID as property
       }));
-      const effectObj = craftableArr.find((e) => String(e.effect) === effect);
-      return effectObj;
+      const effectObj = craftableArr.find((e) => String(e.effect) === effect && (!isAustralium || e.australium));
+      if (effectObj) return effectObj;
+      // fallback to just effect match
+      const fallbackEffectObj = craftableArr.find((e) => String(e.effect) === effect);
+      return fallbackEffectObj;
     }
   }
-  // For non-unusuals, Craftable is an array or object
+
+  // For australium, pick the entry with australium: true if present
+  if (isAustralium && Array.isArray(tradable.Craftable)) {
+    const aussieEntry = tradable.Craftable.find(e => e.australium === true);
+    if (aussieEntry) return aussieEntry;
+  }
+
+  // Otherwise, just return the first
   if (Array.isArray(tradable.Craftable)) {
     return tradable.Craftable[0];
   } else {
