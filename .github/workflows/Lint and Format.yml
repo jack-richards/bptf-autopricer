@@ -1,10 +1,6 @@
 name: Lint and Format Code Base
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
