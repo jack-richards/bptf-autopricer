@@ -40,6 +40,7 @@ module.exports = [
     },
     rules: {
       'no-unused-vars': 'warn',
+      'no-unused-private-class-members': 'error',
       'no-console': 'off',
       eqeqeq: 'error',
       curly: 'error',
