@@ -81,7 +81,7 @@ Methods.prototype.getRight = function (v) {
 // the metal cost. It's then rounded down to the nearest 0.11.
 
 // From here, the metal (being both the worth of the keys and the metal value), is
-// divided into the sell price of a key. Totaling the amount of keys that could be
+// divided into the sell price of a key. Totalling the amount of keys that could be
 // afforded with the pure metal value. The metal component is calculated by taking the
 // remainder of the rounded total value divided by keyPrice. This gives the amount of
 // metal that couldn't be converted into a whole key.
@@ -151,7 +151,7 @@ Methods.prototype.getItemPriceFromExternalPricelist = function (
       },
     };
   }
-  // Ensure priceObj has the expected structure
+  // Ensure price object has the expected structure
   if (!priceObj) {
     throw new Error('Item not found in backpack.tf pricelist.');
   }
@@ -274,7 +274,7 @@ Methods.prototype.validatePrice = function (percentageDifferences) {
 
 Methods.prototype.waitXSeconds = async function (seconds) {
   return new Promise((resolve) => {
-    // Convert to miliseconds and then set timeout.
+    // Convert to milliseconds and then set timeout.
     setTimeout(resolve, seconds * 1000);
   });
 };

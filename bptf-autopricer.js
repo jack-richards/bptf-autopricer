@@ -1,15 +1,15 @@
 // This file is part of the BPTF Autopricer project.
 // It is a Node.js application that connects to Backpack.tf's WebSocket API,
 const fs = require('fs');
+const path = require('path');
 const pLimit = require('p-limit').default; // For limiting concurrent operations
+const Schema = require('@tf2autobot/tf2-schema');
 const methods = require('./methods');
 const Methods = new methods();
-const path = require('path');
 const { validateConfig } = require('./modules/configValidation');
 const CONFIG_PATH = path.resolve(__dirname, 'config.json');
 const config = validateConfig(CONFIG_PATH);
 const PriceWatcher = require('./modules/PriceWatcher'); //outdated price logging
-const Schema = require('@tf2autobot/tf2-schema');
 const SCHEMA_PATH = './schema.json';
 // Paths to the pricelist and item list files.
 const PRICELIST_PATH = './files/pricelist.json';
@@ -151,7 +151,7 @@ const calculateAndEmitPrices = async () => {
     const pricableSkuSet = new Set(pricableSkus);
     // Get all item names as usual
     let allItemNames = getAllPricedItemNamesWithEffects(external_pricelist, schemaManager);
-    // Only keep names whose SKU is in the pricable set
+    // Only keep names whose SKU is in the price-able set
     itemNames = allItemNames.filter((name) =>
       pricableSkuSet.has(schemaManager.schema.getSkuFromName(name))
     );
@@ -246,10 +246,10 @@ schemaManager.init(async function (err) {
   console.log(`Key object initialised to bptf base: ${JSON.stringify(keyobj)}`);
   // Get external pricelist.
   //external_pricelist = await Methods.getExternalPricelist();
-  // Calculate and emit prices on startup.
+  // Calculate and emit prices on start up.
   await calculateAndEmitPrices();
   console.log('Prices calculated and emitted on startup.');
-  // Call this once at startup if needed
+  // Call this once at start-up if needed
   //await initializeListingStats(db);
   //console.log('Listing stats initialized.');
   //InitialKeyPricingContinued
@@ -397,7 +397,7 @@ const determinePrice = async (name, sku) => {
   });
 
   // We prioritise using listings from bots in our prioritySteamIds list.
-  // I.e., we move listings by those trusted steamids to the front of the
+  // I.e., we move listings by those trusted steam ids to the front of the
   // array, to be used as a priority over any others.
 
   buyFiltered = buyListings.rows.sort((a, b) => {
@@ -467,7 +467,7 @@ const filterOutliers = (listingsArray) => {
   }
   // Get the first 3 buy listings from the filtered listings and calculate the mean.
   // The listings here should be free of outliers. It's also sorted in order of
-  // trusted steamids (when applicable).
+  // trusted steam ids (when applicable).
   var filteredMean = 0;
   for (var i = 0; i <= 2; i++) {
     filteredMean += +Methods.toMetal(filteredListings[i].currencies, keyobj.metal);
@@ -496,7 +496,7 @@ async function isSellPriceOutlier(sku, candidateSellMetal, threshold = 3) {
   const mean = prices.reduce((a, b) => a + b, 0) / prices.length;
   const stdDev = Math.sqrt(prices.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / prices.length);
 
-  // If stdDev is 0 (all prices the same), only allow exact match
+  // If stddev is 0 (all prices the same), only allow exact match
   if (stdDev === 0) {
     return candidateSellMetal !== mean;
   }
@@ -506,7 +506,7 @@ async function isSellPriceOutlier(sku, candidateSellMetal, threshold = 3) {
 }
 
 const getAverages = async (name, buyFiltered, sellFiltered, sku, pricetfItem) => {
-  // Initialse two objects to contain the items final buy and sell prices.
+  // Initialise two objects to contain the items final buy and sell prices.
   var final_buyObj = {
     keys: 0,
     metal: 0,
@@ -542,7 +542,7 @@ const getAverages = async (name, buyFiltered, sellFiltered, sku, pricetfItem) =>
     } else {
       // Filter out outliers from set, and calculate a mean average price in terms of metal value.
       let filteredMean = filterOutliers(buyFiltered);
-      // Caclulate the maximum amount of keys that can be made with the metal value returned.
+      // Calculate the maximum amount of keys that can be made with the metal value returned.
       let keys = Math.trunc(filteredMean / keyobj.metal);
       // Calculate the remaining metal value after the value of the keys has been removed.
       let metal = Methods.getRight(filteredMean - keys * keyobj.metal);
@@ -553,7 +553,7 @@ const getAverages = async (name, buyFiltered, sellFiltered, sku, pricetfItem) =>
       };
     }
     // Decided to pick the very first sell listing as it's ordered by the lowest sell price. I.e., the most competitive.
-    // However, I decided to prioritise 'trusted' listings by certain steamids. This may result in a very high sell price, instead
+    // However, I decided to prioritise 'trusted' listings by certain steam ids. This may result in a very high sell price, instead
     // of a competitive one.
     if (sellFiltered.length > 0) {
       // Try trusted listings first, but skip if they're outliers
@@ -621,7 +621,7 @@ const getAverages = async (name, buyFiltered, sellFiltered, sku, pricetfItem) =>
       };
       return [final_buyObj, final_sellObj];
     } else {
-      // We rethrow the error.
+      // We re-throw the error.
       throw error;
     }
   }

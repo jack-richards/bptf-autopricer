@@ -12,7 +12,7 @@ const insertListingsBatch = async (
     return;
   }
 
-  // Deduplicate: keep only the last occurrence for each unique key
+  // De-duplicate: keep only the last occurrence for each unique key
   const dedupedMap = new Map();
   for (const entry of listings) {
     const [response_item, sku, intent, steamid] = entry;
@@ -215,7 +215,7 @@ const deleteOldListings = async (db) => {
     );
   }
 
-  // Failsafe: delete any listing older than the hard max age
+  // Fail safe: delete any listing older than the hard max age
   await db.none(
     'DELETE FROM listings WHERE EXTRACT(EPOCH FROM NOW() - to_timestamp(updated)) >= $1',
     [HARD_MAX_AGE_SECONDS]

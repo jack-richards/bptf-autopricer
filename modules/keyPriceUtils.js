@@ -88,7 +88,6 @@ async function checkKeyPriceStability({ db, Methods, adjustPrice, sendPriceAlert
             WHERE sku = '5021;6'
               AND created_at BETWEEN NOW() - INTERVAL '3 hours' AND NOW();
         `);
-
     const [{ avg_buy: buyB, avg_sell: sellB }] = await db.any(`
             SELECT
                 AVG(buy_price_metal)::float AS avg_buy,

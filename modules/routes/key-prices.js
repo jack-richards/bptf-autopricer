@@ -1,3 +1,4 @@
+/* eslint-disable spellcheck/spell-checker */
 const { db } = require('../../bptf-autopricer');
 const renderPage = require('../layout');
 

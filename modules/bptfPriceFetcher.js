@@ -1,6 +1,6 @@
-const axios = require('axios');
-const fs = require('fs');
 const path = require('path');
+const fs = require('fs');
+const axios = require('axios');
 const config = require('../config.json');
 
 const CACHE_PATH = path.resolve(__dirname, '../bptf-prices.json');
@@ -31,7 +31,7 @@ async function getBptfPrices(force = false) {
 
 // Helper to get price for a specific SKU (handles unusuals and effects)
 function getBptfItemPrice(items, sku) {
-  // SKU: "524;5;u13" (defindex;quality;uEffect)
+  // SKU (defindex;quality;Effect)
   const [defindex, quality, effectPart] = sku.split(';');
   const effect = effectPart && effectPart.startsWith('u') ? effectPart.slice(1) : null;
 
@@ -59,7 +59,7 @@ function getBptfItemPrice(items, sku) {
   if (Array.isArray(tradable.Craftable)) {
     return tradable.Craftable[0];
   } else {
-    // Sometimes it's an object keyed by priceindex
+    // Sometimes it's an object keyed by price index
     return Object.values(tradable.Craftable)[0];
   }
 }

@@ -1,7 +1,12 @@
 const js = require('@eslint/js');
 const prettier = require('eslint-config-prettier');
 const eslintPluginPrettier = require('eslint-plugin-prettier');
-const eslintPluginSpellcheck = require('eslint-plugin-spellcheck'); // <-- add this
+const eslintPluginSpellcheck = require('eslint-plugin-spellcheck');
+const eslintPluginNode = require('eslint-plugin-n');
+const eslintPluginImport = require('eslint-plugin-import');
+const eslintPluginPromise = require('eslint-plugin-promise');
+const eslintPluginSecurity = require('eslint-plugin-security');
+const eslintPluginJsdoc = require('eslint-plugin-jsdoc');
 
 module.exports = [
   js.configs.recommended,
@@ -27,20 +32,41 @@ module.exports = [
     plugins: {
       prettier: eslintPluginPrettier,
       spellcheck: eslintPluginSpellcheck,
+      node: eslintPluginNode,
+      import: eslintPluginImport,
+      promise: eslintPluginPromise,
+      security: eslintPluginSecurity,
+      jsdoc: eslintPluginJsdoc,
     },
     rules: {
       'no-unused-vars': 'warn',
       'no-console': 'off',
       eqeqeq: 'error',
       curly: 'error',
+      // Add any plugin rules you want here, e.g.:
       'prettier/prettier': 'error',
+      'node/no-unsupported-features/es-syntax': 'error',
+      'node/no-missing-import': 'error',
+      'node/no-extraneous-import': 'error',
+      'node/no-unsupported-features/node-builtins': 'error',
+      'import/no-unresolved': 'error',
+      'promise/always-return': 'warn',
+      'promise/no-nesting': 'warn',
+      'promise/no-promise-in-callback': 'warn',
+      'promise/no-return-wrap': 'warn',
+      'security/detect-object-injection': 'off',
+      'jsdoc/check-alignment': 'warn',
+      'jsdoc/check-tag-names': 'warn',
+      'jsdoc/check-types': 'warn',
+      'jsdoc/require-param': 'warn',
+      'jsdoc/require-returns': 'warn',
       'spellcheck/spell-checker': [
         1,
         {
           comments: true,
-          strings: true,
+          strings: false,
           identifiers: false,
-          lang: 'en_US',
+          lang: 'en_GB',
           skipWords: [
             'bptf',
             'sku',
@@ -55,9 +81,37 @@ module.exports = [
             'keyobj',
             'fs',
             'utf8',
+            'tf',
+            'Ds',
+            'stddev',
+            'unusuals',
+            'craftable',
+            'uncraftable',
+            'utf',
+            'ws',
+            'wss',
+            'pricer',
+            'killstreak',
+            'eqeqeq',
+            'pnl',
+            'timestamps',
+            'td',
+            'tr',
+            'href',
+            'inbot',
+            'etc',
+            'pg',
+            'io',
+            'autopricers',
+            'rn',
+            'avg',
+            'std',
           ],
         },
       ],
+      'import/export': 'error',
+      'import/no-duplicates': 'error',
+      'import/order': 'warn',
     },
   },
 ];
