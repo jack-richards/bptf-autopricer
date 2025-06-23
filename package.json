@@ -2,14 +2,6 @@
   "name": "bptf-autopricer",
   "version": "1.0.0",
   "description": "Automatically prices items using listing data from backpack.tf, with data from prices.tf acting as a baseline.",
-  "main": "bptf-autopricer.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/OliverPerring/bliss-autopricer.git"
-  },
   "keywords": [
     "tf2",
     "team fortress 2",
@@ -19,12 +11,20 @@
     "bptf",
     "bptf autopricer"
   ],
-  "author": "Oliver Perring",
-  "license": "MIT",
+  "homepage": "https://github.com/jack-richards/bptf-autopricer#readme",
   "bugs": {
     "url": "https://github.com/jack-richards/bptf-autopricer/issues"
   },
-  "homepage": "https://github.com/jack-richards/bptf-autopricer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OliverPerring/bliss-autopricer.git"
+  },
+  "license": "MIT",
+  "author": "Oliver Perring",
+  "main": "bptf-autopricer.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
   "dependencies": {
     "@tf2autobot/tf2-schema": "^4.3.0",
     "async-lock": "^1.4.0",
@@ -50,6 +50,7 @@
     "eslint-plugin-security": "^3.0.1",
     "eslint-plugin-spellcheck": "^0.0.20",
     "prettier": "^3.5.3",
+    "prettier-plugin-packagejson": "^2.5.15",
     "prettier-plugin-sql": "^0.19.1"
   }
 }
