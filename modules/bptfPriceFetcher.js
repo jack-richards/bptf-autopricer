@@ -138,14 +138,24 @@ function getAllPricedItemNamesWithEffects(external_pricelist, schemaManager) {
           const arrOrObj = qualityObj.Tradable[craftType];
           // Unusuals and rare qualities: Craftable is an object keyed by effect ID
           if (typeof arrOrObj === 'object' && !Array.isArray(arrOrObj)) {
-            for (const effectId in arrOrObj) {
-              const effectName = effects[effectId] || effectId;
+            // Only add effect name for Unusuals (qualityId === '5')
+            if (qualityId === '5') {
+              for (const effectId in arrOrObj) {
+                const effectName = effects[effectId] || effectId;
+                for (const ks of killstreakTiers) {
+                  const ksPrefix = ks ? ks + ' ' : '';
+                  // Only add quality if not Unique (6) and not Unusual (5)
+                  const prefix = qualityId !== '6' && qualityId !== '5' ? qualityName + ' ' : '';
+                  // Compose: "Professional Killstreak Burning Flames Strange Item"
+                  names.push(`${ksPrefix}${effectName} ${prefix}${itemName}`.trim());
+                }
+              }
+            } else {
+              // For non-unusuals, do NOT prepend effect name
               for (const ks of killstreakTiers) {
                 const ksPrefix = ks ? ks + ' ' : '';
-                // Only add quality if not Unique (6) and not Unusual (5)
                 const prefix = qualityId !== '6' && qualityId !== '5' ? qualityName + ' ' : '';
-                // Compose: "Professional Killstreak Burning Flames Strange Item"
-                names.push(`${ksPrefix}${effectName} ${prefix}${itemName}`.trim());
+                names.push(`${ksPrefix}${prefix}${itemName}`.trim());
               }
             }
           } else if (Array.isArray(arrOrObj)) {
