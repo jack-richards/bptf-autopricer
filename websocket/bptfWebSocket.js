@@ -22,6 +22,7 @@ function initBptfWebSocket({
   excludedListingDescriptions,
   blockedAttributes,
   logFile,
+  onListingUpdate,
 }) {
   const rws = new ReconnectingWebSocket('wss://ws.backpack.tf/events/', undefined, {
     WebSocket: ws,
@@ -110,6 +111,7 @@ function initBptfWebSocket({
                   );
                 }
                 queueInsertListing(response_item, sku, currencies, intent, steamid);
+                onListingUpdate(sku);
               } catch (e) {
                 console.log(e);
                 console.log("Couldn't create a price for " + response_item.name);

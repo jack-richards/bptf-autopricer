@@ -89,33 +89,33 @@ Or run the following SQL manually:
 
 ```sql
 CREATE TABLE tf2.listings (
-    name character varying NOT NULL,
-    sku character varying NOT NULL,
-    currencies json NOT NULL,
-    intent character varying NOT NULL,
-    updated bigint NOT NULL,
-    steamid character varying NOT NULL,
-    PRIMARY KEY (name, sku, intent, steamid)
+  name character varying NOT NULL,
+  sku character varying NOT NULL,
+  currencies json NOT NULL,
+  intent character varying NOT NULL,
+  updated bigint NOT NULL,
+  steamid character varying NOT NULL,
+  PRIMARY KEY (name, sku, intent, steamid)
 );
 
 CREATE TABLE tf2.key_prices (
-    id SERIAL PRIMARY KEY,
-    sku TEXT NOT NULL,
-    buy_price_metal DECIMAL NOT NULL,
-    sell_price_metal DECIMAL NOT NULL,
-    timestamp INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  id SERIAL PRIMARY KEY,
+  sku TEXT NOT NULL,
+  buy_price_metal DECIMAL NOT NULL,
+  sell_price_metal DECIMAL NOT NULL,
+  timestamp INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE tf2.listing_stats (
-    sku TEXT PRIMARY KEY,
-    current_count INTEGER DEFAULT 0,
-    moving_avg_count REAL DEFAULT 0,
-    last_updated TIMESTAMP DEFAULT NOW(),
-    current_buy_count integer DEFAULT 0,
-    moving_avg_buy_count real DEFAULT 0,
-    current_sell_count integer DEFAULT 0,
-    moving_avg_sell_count real DEFAULT 0
+  sku TEXT PRIMARY KEY,
+  current_count INTEGER DEFAULT 0,
+  moving_avg_count REAL DEFAULT 0,
+  last_updated TIMESTAMP DEFAULT NOW (),
+  current_buy_count integer DEFAULT 0,
+  moving_avg_buy_count real DEFAULT 0,
+  current_sell_count integer DEFAULT 0,
+  moving_avg_sell_count real DEFAULT 0
 );
 ```
 
@@ -131,8 +131,17 @@ You should see the three tables listed.
 Test permissions by inserting a test row (replace values as needed):
 
 ```sql
-INSERT INTO tf2.listings (name, sku, currencies, intent, updated, steamid)
-VALUES ('Test Item', '123;6', '{"keys":1,"metal":10}', 'buy', 1700000000, '12345678901234567');
+INSERT INTO
+  tf2.listings (name, sku, currencies, intent, updated, steamid)
+VALUES
+  (
+    'Test Item',
+    '123;6',
+    '{"keys":1,"metal":10}',
+    'buy',
+    1700000000,
+    '12345678901234567'
+  );
 ```
 
 If you get no errors, your user has the correct permissions.

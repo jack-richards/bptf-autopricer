@@ -50,9 +50,19 @@ function getBptfItemPrice(items, sku) {
 
   // For unusuals, find the correct effect
   if (quality === '5' && effect) {
-    // Craftable is an array for unusuals
-    const effectObj = tradable.Craftable.find((e) => String(e.effect) === effect);
-    return effectObj || tradable.Craftable[0];
+    if (Array.isArray(tradable.Craftable)) {
+      // Craftable is an array for unusuals (rare, but handle just in case)
+      const effectObj = tradable.Craftable.find((e) => String(e.effect) === effect);
+      return effectObj || tradable.Craftable[0];
+    } else {
+      // Craftable is an object keyed by effect ID
+      const craftableArr = Object.entries(tradable.Craftable).map(([effectId, obj]) => ({
+        ...obj,
+        effect: effectId, // inject effect ID as property
+      }));
+      const effectObj = craftableArr.find((e) => String(e.effect) === effect);
+      return effectObj;
+    }
   }
 
   // For non-unusuals, Craftable is an array or object

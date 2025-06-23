@@ -64,6 +64,8 @@ const blockedAttributes = config.blockedAttributes;
 
 const fallbackOntoPricesTf = config.fallbackOntoPricesTf;
 
+const updatedSkus = new Set();
+
 // Create database instance for pg-promise.
 const createDb = require('./modules/db');
 const { db, pgp } = createDb(config);
@@ -142,6 +144,73 @@ async function getPricableItems(db) {
   return rows.map((r) => r.sku);
 }
 
+async function emitDefaultBptfPricesForUnpriceableItems() {
+  // 1. Get all item names
+  const allItemNames = getAllPricedItemNamesWithEffects(external_pricelist, schemaManager);
+
+  // 2. Read current pricelist
+  const pricelist = JSON.parse(fs.readFileSync(PRICELIST_PATH, 'utf8'));
+  const pricedSkus = new Set(pricelist.items.map((i) => i.sku));
+
+  // 3. Get SKUs with 3+ buy and 3+ sell listings
+  const pricableSkus = new Set(await getPricableItems(db));
+
+  // 4. Filter out items already in pricelist or with enough listings
+  const unpriceableNames = allItemNames.filter((name) => {
+    const sku = schemaManager.schema.getSkuFromName(name);
+    return sku && !pricedSkus.has(sku) && !pricableSkus.has(sku);
+  });
+
+  // 5. For each, get BPTF price, adjust, and emit
+  for (const name of unpriceableNames) {
+    const sku = schemaManager.schema.getSkuFromName(name);
+    if (!sku) {
+      continue;
+    }
+    const data = Methods.getItemPriceFromExternalPricelist(
+      sku,
+      external_pricelist,
+      keyobj.metal,
+      schemaManager
+    );
+    const pricetfItem = data.pricetfItem;
+    if (
+      !pricetfItem ||
+      (pricetfItem.buy.keys === 0 && pricetfItem.buy.metal === 0) ||
+      (pricetfItem.sell.keys === 0 && pricetfItem.sell.metal === 0)
+    ) {
+      continue; // skip if no valid price
+    }
+
+    // Adjust prices: +25% sell, -25% buy
+    const adjust = (val, percent) => Math.max(0, Math.round((val + percent * val) * 100) / 100);
+
+    const buy = {
+      keys: pricetfItem.buy.keys,
+      metal: adjust(pricetfItem.buy.metal, -0.25),
+    };
+    const sell = {
+      keys: pricetfItem.sell.keys,
+      metal: adjust(pricetfItem.sell.metal, 0.25),
+    };
+
+    // Auto bots expect: { name, sku, source, time, buy, sell }
+    const item = {
+      name,
+      sku,
+      source: 'bptf',
+      time: Math.floor(Date.now() / 1000),
+      buy,
+      sell,
+    };
+
+    emitQueue.enqueue(item);
+  }
+  console.log(
+    `Emitted default BPTF prices for ${unpriceableNames.length} items not in pricelist and with <3 buy/sell listings.`
+  );
+}
+
 const calculateAndEmitPrices = async () => {
   await deleteOldListings(db);
 
@@ -149,12 +218,15 @@ const calculateAndEmitPrices = async () => {
   if (config.priceAllItems) {
     const pricableSkus = await getPricableItems(db);
     const pricableSkuSet = new Set(pricableSkus);
+    const skusToPrice = new Set(Array.from(updatedSkus).filter((sku) => pricableSkuSet.has(sku)));
     // Get all item names as usual
     let allItemNames = getAllPricedItemNamesWithEffects(external_pricelist, schemaManager);
-    // Only keep names whose SKU is in the price-able set
+    // Only keep names whose SKU is in the price-able set and has been recently updated
     itemNames = allItemNames.filter((name) =>
-      pricableSkuSet.has(schemaManager.schema.getSkuFromName(name))
+      skusToPrice.has(schemaManager.schema.getSkuFromName(name))
     );
+
+    updatedSkus.clear();
   } else {
     itemNames = Array.from(getAllowedItemNames());
   }
@@ -246,6 +318,8 @@ schemaManager.init(async function (err) {
   console.log(`Key object initialised to bptf base: ${JSON.stringify(keyobj)}`);
   // Get external pricelist.
   //external_pricelist = await Methods.getExternalPricelist();
+  await emitDefaultBptfPricesForUnpriceableItems();
+  console.log(`Default BPTF prices emitted for non price able items.`);
   // Calculate and emit prices on start up.
   await calculateAndEmitPrices();
   console.log('Prices calculated and emitted on startup.');
@@ -749,6 +823,7 @@ initBptfWebSocket({
   allowAllItems,
   schemaManager,
   Methods,
+  onListingUpdate: (sku) => updatedSkus.add(sku),
   insertListing: (...args) => insertListing(db, updateListingStats, ...args),
   insertListingsBatch: (listings) => insertListingsBatch(pgp, db, updateListingStats, listings),
   deleteRemovedListing: (...args) => deleteRemovedListing(db, updateListingStats, ...args),
