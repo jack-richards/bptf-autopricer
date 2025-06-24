@@ -208,6 +208,21 @@ Methods.prototype.calculatePricingAPIDifferences = function (
     }
   }
 
+  //If pricetfitem contains ;kt-, it is killstreak, so we allow it.
+  if (pricetfItem.sku && pricetfItem.sku.includes(';kt-')) {
+    // Only allow if buy is not more than sell
+    const buyInMetal = this.toMetal(final_buyObj, keyobj.metal);
+    const sellInMetal = this.toMetal(final_sellObj, keyobj.metal);
+    if (buyInMetal >= sellInMetal) {
+      //log buyinmetal and sellinmetal along with the sku and name of the item.
+      console.log(`Blocking killstreak item: ${pricetfItem.sku} (${pricetfItem.name})`);
+      console.log(
+        `Buy in metal: ${buyInMetal}, Sell in metal: ${sellInMetal} buy is higher than sell!`
+      );
+    }
+    return buyInMetal <= sellInMetal;
+  }
+
   var percentageDifferences = {};
 
   var sell_Price_In_Metal = this.toMetal(final_sellObj, keyobj.metal);

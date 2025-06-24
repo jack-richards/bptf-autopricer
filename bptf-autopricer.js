@@ -211,6 +211,104 @@ async function emitDefaultBptfPricesForUnpriceableItems() {
   );
 }
 
+const KILLSTREAK_TIERS = {
+  1: 'Killstreak',
+  2: 'Specialized Killstreak',
+  3: 'Professional Killstreak',
+};
+
+async function getKsItemNamesToPrice(db, allItemNames) {
+  console.log(`Getting killstreak items with enough listings...`);
+  const rows = await db.any(`
+    SELECT sku FROM listing_stats
+    WHERE (sku LIKE '%;kt-1' OR sku LIKE '%;kt-2' OR sku LIKE '%;kt-3')
+      AND current_buy_count > 3 AND current_sell_count > 3
+  `);
+  console.log(`Found ${rows.length} killstreak items with enough listings.`);
+
+  // Build a map from baseSku (defindex + qualities except kt/effect) to name
+  const baseSkuToName = new Map();
+  for (const name of allItemNames) {
+    const sku = schemaManager.schema.getSkuFromName(name);
+    if (!sku) {
+      continue;
+    }
+    // Remove killstreak and effect parts for base matching
+    const parts = sku.split(';');
+    const baseParts = [
+      parts[0],
+      ...parts.slice(1).filter((p) => !p.startsWith('kt-') && !p.startsWith('u')),
+    ];
+    const baseSku = baseParts.join(';');
+    baseSkuToName.set(baseSku, name);
+  }
+
+  const ksNames = [];
+  for (const { sku } of rows) {
+    console.log(`Processing SKU: ${sku}`);
+    // Parse the SKU
+    const parts = sku.split(';');
+    const defindex = parts[0];
+    let ksTier = null;
+    let isStrange = false;
+    let isAustralium = false;
+    let isFestivized = false;
+    let qualities = [];
+
+    for (const part of parts.slice(1)) {
+      if (part.startsWith('kt-')) {
+        ksTier = Number(part.split('-')[1]);
+      } else if (part === '11') {
+        isStrange = true;
+        qualities.push(part);
+      } else if (part === 'australium') {
+        isAustralium = true;
+        qualities.push(part);
+      } else if (part === 'festivized') {
+        isFestivized = true;
+        qualities.push(part);
+      } else if (!part.startsWith('u')) {
+        qualities.push(part);
+      }
+    }
+
+    // Build baseSku for lookup (defindex + all qualities except kt/effect)
+    const baseParts = [defindex, ...qualities];
+    const baseSku = baseParts.join(';');
+    let baseName = baseSkuToName.get(baseSku);
+
+    if (!baseName) {
+      console.warn(`Base name not found for baseSku ${baseSku} (from KS SKU ${sku}), skipping.`);
+      continue;
+    }
+
+    // Remove "Strange" if present for baseName, will re-add if needed
+    let displayName = baseName
+      .replace(/^Strange\s+/i, '')
+      .replace(/^Festivized\s+/i, '')
+      .replace(/^Australium\s+/i, '');
+
+    // Compose KS name in correct order
+    let ksName = '';
+    if (isStrange) {
+      ksName += 'Strange ';
+    }
+    if (isFestivized) {
+      ksName += 'Festivized ';
+    }
+    ksName += KILLSTREAK_TIERS[ksTier] + ' ';
+    if (isAustralium) {
+      ksName += 'Australium ';
+    }
+    ksName += displayName;
+
+    ksNames.push(ksName.trim());
+    console.log(`Added killstreak item name: ${ksName}`);
+  }
+  console.log(`Found ${ksNames.length} killstreak item names to price.`);
+  return ksNames;
+}
+
 const calculateAndEmitPrices = async () => {
   await deleteOldListings(db);
 
@@ -221,10 +319,23 @@ const calculateAndEmitPrices = async () => {
     const skusToPrice = new Set(Array.from(updatedSkus).filter((sku) => pricableSkuSet.has(sku)));
     // Get all item names as usual
     let allItemNames = getAllPricedItemNamesWithEffects(external_pricelist, schemaManager);
+
+    console.log(`Getting killstreak items`);
+
+    const ksNames = await getKsItemNamesToPrice(db, allItemNames);
+
+    console.log(`Found ${ksNames.length} killstreak items to price.`);
+
     // Only keep names whose SKU is in the price-able set and has been recently updated
     itemNames = allItemNames.filter((name) =>
       skusToPrice.has(schemaManager.schema.getSkuFromName(name))
     );
+
+    console.log(`Item names is ${itemNames.length} items before killstreak. `);
+
+    itemNames = [...itemNames, ...ksNames];
+
+    console.log(`Item names is ${itemNames.length} items after killstreak. `);
 
     updatedSkus.clear();
   } else {
@@ -234,6 +345,8 @@ const calculateAndEmitPrices = async () => {
   const limit = pLimit(15); // Limit concurrency to 15, adjust as needed
   const priceHistoryEntries = [];
   const itemsToWrite = [];
+
+  console.log(`About to price ${itemNames.length} items. `);
 
   await Promise.allSettled(
     itemNames.map((name) =>

@@ -31,6 +31,7 @@ async function getBptfPrices(force = false) {
 
 // Helper to get price for a specific SKU (handles unusuals and effects)
 function getBptfItemPrice(items, sku) {
+  // eslint-disable-next-line spellcheck/spell-checker
   // SKU (defindex;quality;Effect;...;australium)
   const parts = sku.split(';');
   const defindex = parts[0];
@@ -40,10 +41,13 @@ function getBptfItemPrice(items, sku) {
   const isAustralium = parts.includes('australium');
 
   // Find all items with this defindex
-  const candidates = Object.entries(items).filter(([name, item]) =>
-    item.defindex && item.defindex.includes(Number(defindex))
+  const candidates = Object.entries(items).filter(
+    // eslint-disable-next-line spellcheck/spell-checker
+    // eslint-disable-next-line no-unused-vars
+    ([name, item]) => item.defindex && item.defindex.includes(Number(defindex))
   );
 
+  // eslint-disable-next-line spellcheck/spell-checker
   // Prefer Australium-named item if SKU has australium
   let itemEntry;
   if (isAustralium) {
@@ -57,7 +61,9 @@ function getBptfItemPrice(items, sku) {
   if (!itemEntry && candidates.length > 0) {
     itemEntry = candidates[0];
   }
-  if (!itemEntry) return null;
+  if (!itemEntry) {
+    return null;
+  }
 
   const item = itemEntry[1];
   if (!item.prices || !item.prices[quality]) {
@@ -73,8 +79,12 @@ function getBptfItemPrice(items, sku) {
   if (quality === '5' && effect) {
     if (Array.isArray(tradable.Craftable)) {
       // Craftable is an array for unusuals (rare, but handle just in case)
-      const effectObj = tradable.Craftable.find((e) => String(e.effect) === effect && (!isAustralium || e.australium));
-      if (effectObj) return effectObj;
+      const effectObj = tradable.Craftable.find(
+        (e) => String(e.effect) === effect && (!isAustralium || e.australium)
+      );
+      if (effectObj) {
+        return effectObj;
+      }
       // fallback to just effect match
       const fallbackEffectObj = tradable.Craftable.find((e) => String(e.effect) === effect);
       return fallbackEffectObj || tradable.Craftable[0];
@@ -84,8 +94,12 @@ function getBptfItemPrice(items, sku) {
         ...obj,
         effect: effectId, // inject effect ID as property
       }));
-      const effectObj = craftableArr.find((e) => String(e.effect) === effect && (!isAustralium || e.australium));
-      if (effectObj) return effectObj;
+      const effectObj = craftableArr.find(
+        (e) => String(e.effect) === effect && (!isAustralium || e.australium)
+      );
+      if (effectObj) {
+        return effectObj;
+      }
       // fallback to just effect match
       const fallbackEffectObj = craftableArr.find((e) => String(e.effect) === effect);
       return fallbackEffectObj;
@@ -94,8 +108,10 @@ function getBptfItemPrice(items, sku) {
 
   // For australium, pick the entry with australium: true if present
   if (isAustralium && Array.isArray(tradable.Craftable)) {
-    const aussieEntry = tradable.Craftable.find(e => e.australium === true);
-    if (aussieEntry) return aussieEntry;
+    const aussieEntry = tradable.Craftable.find((e) => e.australium === true);
+    if (aussieEntry) {
+      return aussieEntry;
+    }
   }
 
   // Otherwise, just return the first
