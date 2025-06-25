@@ -431,8 +431,10 @@ schemaManager.init(async function (err) {
   console.log(`Key object initialised to bptf base: ${JSON.stringify(keyobj)}`);
   // Get external pricelist.
   //external_pricelist = await Methods.getExternalPricelist();
-  await emitDefaultBptfPricesForUnpriceableItems();
-  console.log(`Default BPTF prices emitted for non price able items.`);
+  if (config.priceAllItems) {
+    await emitDefaultBptfPricesForUnpriceableItems();
+    console.log(`Default BPTF prices emitted for non price able items.`);
+  }
   // Calculate and emit prices on start up.
   await calculateAndEmitPrices();
   console.log('Prices calculated and emitted on startup.');
