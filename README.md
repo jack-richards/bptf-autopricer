@@ -1,3 +1,10 @@
+# Deprecated - No Longer Supported
+`bptf-autopricer` will **no longer be supported** - the application no longer works as it depends upon prices.tf for a baseline to compare generated prices to, which has since shut down. 
+
+#### Check out [**bliss-autopricer**](https://github.com/TF2-Price-DB/bliss-autopricer), a fork of my project, that improves upon it greatly, providing accurate pricing data based upon bptf listings without any reliance on an external baseline.
+
+If you are looking to make your own autopricer, the actual pricing logic within this project ( bptf-autopricer ) should still be well-suited for its purpose and has been tested through usage by many. Though as always there is risk, especially when drawing from now unsupported code, so do keep this in mind. 
+
 # bptf-autopricer
 <div align="center"><img src="https://github.com/jack-richards/bptf-autopricer/assets/58331725/203fe808-30ff-4d7d-868c-a3ef6d31497d" alt="logo" style="width: 280px; height: 320px; display: block; margin-left: auto; margin-right: auto;"></div>
 
